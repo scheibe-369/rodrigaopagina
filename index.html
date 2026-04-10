@@ -4,1132 +4,975 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tráfego Studio - Central de Produção</title>
-    
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <style>
       input[type=range] { accent-color: #a855f7; }
       ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+      @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .slide-up { animation: slideUp 0.25s ease-out; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+// ── PALETA DE CORES DOS CLIENTES ──────────────────────────────
+const PALETA = [
+  { id: 'rosa',     label: 'Rosa',     dot: '#f43f5e', theme: 'from-rose-500 to-pink-600',    text: 'text-pink-400',    bg: 'bg-pink-500/10',    border: 'border-pink-500/30' },
+  { id: 'ciano',    label: 'Ciano',    dot: '#06b6d4', theme: 'from-cyan-500 to-blue-600',    text: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30' },
+  { id: 'fucsia',   label: 'Fúcsia',   dot: '#a855f7', theme: 'from-purple-500 to-fuchsia-600', text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/30' },
+  { id: 'laranja',  label: 'Laranja',  dot: '#f97316', theme: 'from-orange-500 to-amber-600',  text: 'text-orange-400',  bg: 'bg-orange-500/10',  border: 'border-orange-500/30' },
+  { id: 'verde',    label: 'Verde',    dot: '#22c55e', theme: 'from-green-500 to-emerald-600', text: 'text-green-400',   bg: 'bg-green-500/10',   border: 'border-green-500/30' },
+  { id: 'amarelo',  label: 'Amarelo',  dot: '#eab308', theme: 'from-yellow-500 to-amber-500',  text: 'text-yellow-400',  bg: 'bg-yellow-500/10',  border: 'border-yellow-500/30' },
+  { id: 'indigo',   label: 'Índigo',   dot: '#6366f1', theme: 'from-indigo-500 to-violet-600', text: 'text-indigo-400',  bg: 'bg-indigo-500/10',  border: 'border-indigo-500/30' },
+  { id: 'vermelho', label: 'Vermelho', dot: '#ef4444', theme: 'from-red-500 to-rose-700',      text: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/30' },
+];
 
-        // --- DADOS ---
-        const CLIENTES = {
-          MOTEIS: { id: 'moteis', name: 'Motéis', theme: 'from-rose-500 to-pink-600', text: 'text-pink-400', bg: 'bg-pink-500/10', border: 'border-pink-500/30' },
-          CUBO:   { id: 'cubo',   name: 'Cubo Self', theme: 'from-cyan-500 to-blue-600', text: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
-          VIV:    { id: 'viv',    name: 'ViV', theme: 'from-purple-500 to-fuchsia-600', text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/30' }
-        };
+// ── CLIENTES INICIAIS ─────────────────────────────────────────
+const CLIENTES_INICIAIS = [
+  { id: 'moteis', name: 'Motéis',   paletaId: 'rosa',  ...PALETA.find(p=>p.id==='rosa') },
+  { id: 'cubo',   name: 'Cubo Self',paletaId: 'ciano', ...PALETA.find(p=>p.id==='ciano') },
+  { id: 'viv',    name: 'ViV',      paletaId: 'fucsia',...PALETA.find(p=>p.id==='fucsia') },
+];
 
-        const TAREFAS_MOCK = [
-          { id: '1', title: 'Campanha Dia dos Namorados', client: CLIENTES.MOTEIS, solicitante: 'Juan', responsavel: '', startDate: '2026-04-05', deadline: '10/05', status: 'doing', progress: 75, platform: 'Meta Ads', prioridade: 'Normal', notes: 'Focar na nova suíte presidencial.\nPedir as fotos oficiais para o Juan até quarta-feira.' },
-          { id: '6', title: 'Ajustar Lances de Leilão de Busca', client: CLIENTES.CUBO, solicitante: 'Juan', responsavel: '', startDate: '2026-04-08', deadline: 'Hoje', status: 'doing', progress: 40, platform: 'Google Ads', prioridade: 'Alta', notes: '' },
-          { id: '2', title: 'Otimização de Palavras-chave (Negativar)', client: CLIENTES.CUBO, solicitante: '', responsavel: '', deadline: '12/04', status: 'review', platform: 'Google Ads', prioridade: 'Normal' },
-          { id: '3', title: 'Estruturar Landing Page Nova Coleção', client: CLIENTES.VIV, solicitante: '', responsavel: '', deadline: '20/04', status: 'todo', platform: 'Web', prioridade: 'Normal' },
-          { id: '7', title: 'Promoção Relâmpago de Feriado', client: CLIENTES.MOTEIS, solicitante: 'Juan', responsavel: '', deadline: 'Urgente', status: 'inbox', platform: 'Meta Ads', prioridade: 'Urgente' },
-          { id: '8', title: 'Relatório Mensal de Março', client: CLIENTES.VIV, solicitante: '', responsavel: '', startDate: '2026-04-01', deadline: '05/04', status: 'done', progress: 100, platform: 'Data Studio', prioridade: 'Normal' },
-        ];
+const TAREFAS_MOCK = [
+  { id:'1',  title:'Campanha Dia dos Namorados',        clientId:'moteis', solicitante:'Juan',   responsavel:'', startDate:'2026-04-05', deadline:'10/05', status:'doing',  progress:75, platform:'Meta Ads',    prioridade:'Normal', notes:'Focar na nova suíte presidencial.\nPedir as fotos oficiais para o Juan até quarta-feira.' },
+  { id:'6',  title:'Ajustar Lances de Leilão de Busca', clientId:'cubo',   solicitante:'Carlos', responsavel:'', startDate:'2026-04-08', deadline:'Hoje',  status:'doing',  progress:40, platform:'Google Ads',  prioridade:'Alta',   notes:'' },
+  { id:'2',  title:'Otimização de Palavras-chave',       clientId:'cubo',   solicitante:'',       responsavel:'', deadline:'12/04',       status:'review', platform:'Google Ads',  prioridade:'Normal' },
+  { id:'3',  title:'Estruturar Landing Page Nova Coleção',clientId:'viv',   solicitante:'',       responsavel:'', deadline:'20/04',       status:'todo',   platform:'Web',         prioridade:'Normal' },
+  { id:'7',  title:'Promoção Relâmpago de Feriado',      clientId:'moteis', solicitante:'Juan',   responsavel:'', deadline:'Urgente',     status:'inbox',  platform:'Meta Ads',    prioridade:'Urgente' },
+  { id:'8',  title:'Relatório Mensal de Março',          clientId:'viv',    solicitante:'',       responsavel:'', startDate:'2026-04-01', deadline:'05/04',status:'done',   progress:100, platform:'Data Studio', prioridade:'Normal' },
+];
 
-        const CRIATIVOS_MOCK = [
-          { id: '1', title: 'CRIATIVO NOVO: Carrossel Dia das Mães', client: CLIENTES.VIV, content: 'Precisamos de 3 imagens no estilo minimalista mostrando a nova coleção. Focar nas cores pastéis.', link: 'https://drive.google.com/exemplo-referencia', status: 'pendente' }
-        ];
+const CRIATIVOS_MOCK = [
+  { id:'1', title:'CRIATIVO NOVO: Carrossel Dia das Mães', clientId:'viv', content:'Precisamos de 3 imagens no estilo minimalista mostrando a nova coleção. Focar nas cores pastéis.', link:'https://drive.google.com/exemplo-referencia', status:'pendente' }
+];
 
-        const ANUNCIOS_MOCK = [
-          { id: '101', client: 'moteis', platform: 'Meta', title: 'Carrossel Suítes Premium', copy: 'Surpreenda quem você ama neste final de semana. Conheça novas suítes premium com hidro e teto solar.', imageUrl: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=400&h=300' },
-          { id: '202', client: 'cubo', platform: 'Meta', title: 'Vídeo Institucional - Segurança', copy: 'Seus bens guardados com a mesma segurança de um banco. 🔒 Assista ao vídeo.', imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=400&h=300' },
-        ];
+const ANUNCIOS_MOCK = [
+  { id:'101', clientId:'moteis', platform:'Meta', title:'Carrossel Suítes Premium', copy:'Surpreenda quem você ama neste final de semana. Conheça novas suítes premium com hidro e teto solar.', imageUrl:'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=400&h=300' },
+  { id:'202', clientId:'cubo',   platform:'Meta', title:'Vídeo Institucional - Segurança', copy:'Seus bens guardados com a mesma segurança de um banco. 🔒 Assista ao vídeo.', imageUrl:'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=400&h=300' },
+];
 
-        const loadLocal = (key, fallback) => {
-            try { const i = window.localStorage.getItem('trafego2_' + key); return i ? JSON.parse(i) : fallback; }
-            catch (e) { return fallback; }
-        };
-        const saveLocal = (key, data) => {
-            try { window.localStorage.setItem('trafego2_' + key, JSON.stringify(data)); }
-            catch (e) { console.error(e); }
-        };
+// ── LOCALSTORAGE ──────────────────────────────────────────────
+const load = (key, fb) => { try { const v = localStorage.getItem('ts3_'+key); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+const save = (key, v) => { try { localStorage.setItem('ts3_'+key, JSON.stringify(v)); } catch {} };
 
-        // --- ESTADO INICIAL DO FORMULÁRIO "NOVA DEMANDA" ---
-        const NOVA_DEMANDA_VAZIA = {
-          title: '', client: 'moteis', solicitante: '', responsavel: '',
-          status: 'inbox', prioridade: 'Normal', platform: 'Meta Ads',
-          deadline: '', startDate: '', progress: 0, notes: ''
-        };
+// ── ESTADO INICIAL NOVO CLIENTE ───────────────────────────────
+const NOVO_CLIENTE_VAZIO = { name:'', paletaId:'rosa' };
+const NOVA_DEMANDA_VAZIA = { title:'', clientId:'', solicitante:'', responsavel:'', status:'inbox', prioridade:'Normal', platform:'Meta Ads', deadline:'', startDate:'', progress:0, notes:'' };
 
-        function App() {
-          const [activeAdTab, setActiveAdTab] = useState('moteis');
-          const [tasks, setTasks]       = useState(() => loadLocal('tasks',     TAREFAS_MOCK));
-          const [anuncios, setAnuncios] = useState(() => loadLocal('anuncios',  ANUNCIOS_MOCK));
-          const [criativos, setCriativos] = useState(() => loadLocal('criativos', CRIATIVOS_MOCK));
-          const [comentarios, setComentarios] = useState(() => loadLocal('comentarios', {}));
+// ── APP PRINCIPAL ─────────────────────────────────────────────
+function App() {
+  const [clientes,   setClientes]   = useState(() => load('clientes', CLIENTES_INICIAIS));
+  const [tasks,      setTasks]      = useState(() => load('tasks',    TAREFAS_MOCK));
+  const [anuncios,   setAnuncios]   = useState(() => load('anuncios', ANUNCIOS_MOCK));
+  const [criativos,  setCriativos]  = useState(() => load('criativos',CRIATIVOS_MOCK));
+  const [comentarios,setComentarios]= useState(() => load('comentarios', {}));
+  const [activeAdTab,setActiveAdTab]= useState('');
 
-          // Modais
-          const [isAdModalOpen,        setIsAdModalOpen]        = useState(false);
-          const [isCreativeModalOpen,  setIsCreativeModalOpen]  = useState(false);
-          const [isEditTaskModalOpen,  setIsEditTaskModalOpen]  = useState(false);
-          const [isNovaDemandaOpen,    setIsNovaDemandaOpen]    = useState(false);
-          const [editingTask,          setEditingTask]          = useState(null);
-          const [comentarioTaskId,     setComentarioTaskId]     = useState(null);
-          const [novoComentario,       setNovoComentario]       = useState('');
+  // Modais
+  const [modal, setModal] = useState(null); // 'novadem'|'cliente'|'editTask'|'criativo'|'anuncio'|'coms'
+  const [editingTask, setEditingTask] = useState(null);
+  const [comentarioTaskId, setComentarioTaskId] = useState(null);
+  const [nomeUsuario, setNomeUsuario] = useState(() => load('nomeUsuario',''));
+  const [novoComentario, setNovoComentario] = useState('');
 
-          const [newAd,       setNewAd]       = useState({ title: '', copy: '', client: 'moteis', platform: 'Meta', imageUrl: '' });
-          const [newCreative, setNewCreative] = useState({ title: 'CRIATIVO NOVO: ', content: '', client: 'moteis', link: '' });
-          const [novaDemanda, setNovaDemanda] = useState({ ...NOVA_DEMANDA_VAZIA });
+  // Forms
+  const [novoCliente, setNovoCliente] = useState({...NOVO_CLIENTE_VAZIO});
+  const [novaDemanda, setNovaDemanda] = useState({...NOVA_DEMANDA_VAZIA});
+  const [newCreative, setNewCreative] = useState({ title:'CRIATIVO NOVO: ', content:'', clientId:'', link:'' });
+  const [newAd,       setNewAd]       = useState({ title:'', copy:'', clientId:'', platform:'Meta', imageUrl:'' });
 
-          // Helpers comentários
-          const getComentariosDaTarefa = (taskId) => comentarios[String(taskId)] || [];
-          const abrirComentarios = (taskId) => { setComentarioTaskId(String(taskId)); setNovoComentario(''); };
-          const fecharComentarios = () => setComentarioTaskId(null);
-          const adicionarComentario = (e) => {
-            e.preventDefault();
-            if (!novoComentario.trim()) return;
-            const novo = { id: Date.now().toString(), texto: novoComentario.trim(), autor: 'Você', data: new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) };
-            setComentarios(curr => {
-              const updated = { ...curr, [comentarioTaskId]: [...(curr[comentarioTaskId] || []), novo] };
-              saveLocal('comentarios', updated);
-              return updated;
-            });
-            setNovoComentario('');
-          };
+  // Init activeAdTab
+  useEffect(() => { if (!activeAdTab && clientes.length) setActiveAdTab(clientes[0].id); }, [clientes]);
 
-          // --- SYNC ---
-          const syncData = (colName, item) => {
-            if (colName === 'tasks') setTasks(curr => {
-              const i = curr.findIndex(x => String(x.id) === String(item.id));
-              const ns = i > -1 ? Object.assign([], curr, {[i]: item}) : [item, ...curr];
-              saveLocal('tasks', ns); return ns;
-            });
-            if (colName === 'anuncios') setAnuncios(curr => {
-              const i = curr.findIndex(x => String(x.id) === String(item.id));
-              const ns = i > -1 ? Object.assign([], curr, {[i]: item}) : [item, ...curr];
-              saveLocal('anuncios', ns); return ns;
-            });
-            if (colName === 'criativos') setCriativos(curr => {
-              const i = curr.findIndex(x => String(x.id) === String(item.id));
-              const ns = i > -1 ? Object.assign([], curr, {[i]: item}) : [item, ...curr];
-              saveLocal('criativos', ns); return ns;
-            });
-          };
+  // ── HELPERS ──
+  const clienteById = id => clientes.find(c=>c.id===id) || clientes[0] || { id:'?', name:'?', theme:'from-gray-500 to-gray-700', text:'text-gray-400', bg:'bg-gray-500/10', border:'border-gray-500/30' };
+  const paleta = id => PALETA.find(p=>p.id===id) || PALETA[0];
 
-          const deleteData = (colName, itemId) => {
-            if (colName === 'criativos') setCriativos(curr => { const ns = curr.filter(c => String(c.id) !== String(itemId)); saveLocal('criativos', ns); return ns; });
-            if (colName === 'tasks') setTasks(curr => { const ns = curr.filter(c => String(c.id) !== String(itemId)); saveLocal('tasks', ns); return ns; });
-          };
+  const prioridadeCor = p => {
+    if (p==='Urgente') return 'text-red-400 bg-red-500/10 border-red-500/30';
+    if (p==='Alta')    return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
+    return 'text-gray-400 bg-white/5 border-white/10';
+  };
 
-          // --- LÓGICA ---
-          const doingTasks  = tasks.filter(t => t.status === 'doing');
-          const queueTasks  = tasks.filter(t => t.status !== 'doing' && t.status !== 'inbox' && t.status !== 'done');
-          const inboxTasks  = tasks.filter(t => t.status === 'inbox');
-          const doneTasks   = tasks.filter(t => t.status === 'done');
+  // ── SYNC ──
+  const syncList = (setter, key, item) => setter(curr => {
+    const i = curr.findIndex(x=>String(x.id)===String(item.id));
+    const ns = i>-1 ? Object.assign([],curr,{[i]:item}) : [item,...curr];
+    save(key,ns); return ns;
+  });
+  const delFromList = (setter, key, id) => setter(curr => { const ns=curr.filter(x=>String(x.id)!==String(id)); save(key,ns); return ns; });
 
-          const getTempoDecorrido = (d) => {
-            if (!d) return '0 dias';
-            const diff = Math.ceil(Math.abs(new Date() - new Date(d)) / 86400000);
-            return diff === 1 ? '1 dia' : `${diff} dias`;
-          };
+  const syncTask     = t  => syncList(setTasks,    'tasks',    t);
+  const syncAnuncio  = a  => syncList(setAnuncios, 'anuncios', a);
+  const syncCriativo = c  => syncList(setCriativos,'criativos',c);
 
-          const clienteById = (id) => Object.values(CLIENTES).find(c => c.id === id) || CLIENTES.MOTEIS;
+  // ── TAREFAS ──
+  const doingTasks = tasks.filter(t=>t.status==='doing');
+  const queueTasks = tasks.filter(t=>t.status!=='doing'&&t.status!=='inbox'&&t.status!=='done');
+  const inboxTasks = tasks.filter(t=>t.status==='inbox');
+  const doneTasks  = tasks.filter(t=>t.status==='done');
 
-          const aprovarParaFila    = (id) => { const t = tasks.find(t => String(t.id) === String(id)); if(t) syncData('tasks', {...t, status: 'todo'}); };
-          const moverParaFinalizado = (id) => {
-            const t = tasks.find(t => String(t.id) === String(id)) || editingTask;
-            if(t) syncData('tasks', {...t, status: 'done', progress: 100});
-            if(isEditTaskModalOpen) setIsEditTaskModalOpen(false);
-          };
-          const atualizarNotaTarefa = (id, nota) => setTasks(curr => curr.map(t => String(t.id) === String(id) ? {...t, notes: nota} : t));
-          const salvarNotaFinal     = (task) => syncData('tasks', task);
+  const getTempoDecorrido = d => {
+    if (!d) return '0 dias';
+    const diff = Math.ceil(Math.abs(new Date()-new Date(d))/86400000);
+    return diff===1?'1 dia':`${diff} dias`;
+  };
 
-          const abrirEdicaoTarefa = (task) => { setEditingTask({...task}); setIsEditTaskModalOpen(true); };
-          const salvarEdicaoTarefa = (e) => { e.preventDefault(); syncData('tasks', editingTask); setIsEditTaskModalOpen(false); };
+  const aprovarParaFila = id => { const t=tasks.find(t=>String(t.id)===String(id)); if(t) syncTask({...t,status:'todo'}); };
+  const moverParaFinalizado = id => {
+    const t=tasks.find(t=>String(t.id)===String(id))||editingTask;
+    if(t) syncTask({...t,status:'done',progress:100});
+    if(modal==='editTask') setModal(null);
+  };
+  const atualizarNota = (id,nota) => setTasks(curr=>curr.map(t=>String(t.id)===String(id)?{...t,notes:nota}:t));
+  const salvarNota = task => syncTask(task);
 
-          // NOVA DEMANDA — cria task com todos os campos
-          const handleCriarDemanda = (e) => {
-            e.preventDefault();
-            const clienteObj = clienteById(novaDemanda.client);
-            const task = {
-              ...novaDemanda,
-              id: Date.now().toString(),
-              client: clienteObj,
-              progress: Number(novaDemanda.progress) || 0,
-            };
-            syncData('tasks', task);
-            setIsNovaDemandaOpen(false);
-            setNovaDemanda({ ...NOVA_DEMANDA_VAZIA });
-          };
+  // ── COMENTÁRIOS ──
+  const getComs = taskId => comentarios[String(taskId)] || [];
+  const abrirComs = taskId => { setComentarioTaskId(String(taskId)); setNovoComentario(''); setModal('coms'); };
+  const adicionarCom = e => {
+    e.preventDefault();
+    if (!novoComentario.trim()) return;
+    const autor = nomeUsuario.trim() || 'Anônimo';
+    const novo = { id:Date.now().toString(), texto:novoComentario.trim(), autor, data:new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) };
+    setComentarios(curr => { const up={...curr,[comentarioTaskId]:[...(curr[comentarioTaskId]||[]),novo]}; save('comentarios',up); return up; });
+    setNovoComentario('');
+  };
 
-          const handleAddAd = (e) => {
-            e.preventDefault();
-            syncData('anuncios', { ...newAd, id: Date.now().toString() });
-            setIsAdModalOpen(false);
-            setNewAd({ title: '', copy: '', client: 'moteis', platform: 'Meta', imageUrl: '' });
-          };
+  // ── CLIENTES ──
+  const handleAddCliente = e => {
+    e.preventDefault();
+    if (!novoCliente.name.trim()) return;
+    const p = paleta(novoCliente.paletaId);
+    const c = { id:'c_'+Date.now(), name:novoCliente.name.trim(), paletaId:novoCliente.paletaId, ...p };
+    const updated = [...clientes,c]; setClientes(updated); save('clientes',updated);
+    setModal(null); setNovoCliente({...NOVO_CLIENTE_VAZIO});
+    setActiveAdTab(c.id);
+  };
 
-          const handleAddCreative = (e) => {
-            e.preventDefault();
-            const clienteObj = clienteById(newCreative.client);
-            syncData('criativos', { ...newCreative, id: Date.now().toString(), client: clienteObj, status: 'pendente' });
-            setIsCreativeModalOpen(false);
-            setNewCreative({ title: 'CRIATIVO NOVO: ', content: '', client: 'moteis', link: '' });
-          };
+  // ── NOVA DEMANDA ──
+  const handleCriarDemanda = e => {
+    e.preventDefault();
+    const cId = novaDemanda.clientId || (clientes[0]?.id||'');
+    syncTask({ ...novaDemanda, id:Date.now().toString(), clientId:cId, progress:Number(novaDemanda.progress)||0 });
+    setModal(null); setNovaDemanda({...NOVA_DEMANDA_VAZIA});
+  };
 
-          const prioridadeCor = (p) => {
-            if (p === 'Urgente') return 'text-red-400 bg-red-500/10 border-red-500/30';
-            if (p === 'Alta')    return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
-            return 'text-gray-400 bg-white/5 border-white/10';
-          };
+  // ── EDITAR TAREFA ──
+  const abrirEdicao = task => { setEditingTask({...task}); setModal('editTask'); };
+  const salvarEdicao = e => { e.preventDefault(); syncTask(editingTask); setModal(null); };
 
-          // ============ RENDER ============
-          return (
-            <div className="min-h-screen bg-[#070b14] font-sans text-gray-200 overflow-x-hidden selection:bg-fuchsia-500/30 pb-20">
-              
-              {/* BG blur orbs */}
-              <div className="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-900/20 blur-[120px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[120px]"></div>
-              </div>
+  // ── CRIATIVO ──
+  const handleAddCriativo = e => {
+    e.preventDefault();
+    const cId = newCreative.clientId || (clientes[0]?.id||'');
+    syncCriativo({...newCreative, id:Date.now().toString(), clientId:cId, status:'pendente'});
+    setModal(null); setNewCreative({title:'CRIATIVO NOVO: ',content:'',clientId:'',link:''});
+  };
 
-              <main className="max-w-7xl mx-auto p-6 lg:p-10 space-y-12">
-                
-                {/* ===== HEADER ===== */}
-                <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
+  // ── ANÚNCIO ──
+  const handleAddAnuncio = e => {
+    e.preventDefault();
+    const cId = newAd.clientId || (clientes[0]?.id||'');
+    syncAnuncio({...newAd, id:Date.now().toString(), clientId:cId});
+    setModal(null); setNewAd({title:'',copy:'',clientId:'',platform:'Meta',imageUrl:''});
+  };
+
+  const closeModal = () => setModal(null);
+
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#070b14] font-sans text-gray-200 overflow-x-hidden selection:bg-fuchsia-500/30 pb-24">
+
+      {/* BG orbs */}
+      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-900/20 blur-[120px]"/>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[120px]"/>
+      </div>
+
+      <main className="max-w-7xl mx-auto p-6 lg:p-10 space-y-12">
+
+        {/* ═══ HEADER ═══ */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <i className="fa-solid fa-wand-magic-sparkles text-fuchsia-400"/>
+              <span className="text-sm font-semibold tracking-wider text-fuchsia-400 uppercase">Tráfego Studio</span>
+            </div>
+            <h1 className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-500 tracking-tight">
+              Central de Produção
+            </h1>
+            <p className="text-gray-400 mt-2 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400"/>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"/>
+              </span>
+              Salvo localmente no navegador
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl px-5 py-3 backdrop-blur-md">
+              <div className="text-2xl font-bold text-yellow-400">{String(inboxTasks.length).padStart(2,'0')}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Solicitações</div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 backdrop-blur-md">
+              <div className="text-2xl font-bold text-white">{String(doingTasks.length).padStart(2,'0')}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Em Foco</div>
+            </div>
+            <button onClick={()=>{ setNovaDemanda({...NOVA_DEMANDA_VAZIA,clientId:clientes[0]?.id||''}); setModal('novadem'); }}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/20">
+              <i className="fa-solid fa-plus"/> Nova Demanda
+            </button>
+            <button onClick={()=>setModal('cliente')}
+              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:-translate-y-0.5">
+              <i className="fa-solid fa-user-plus"/> Cliente
+            </button>
+          </div>
+        </header>
+
+        {/* ═══ INBOX ═══ */}
+        <section className="bg-yellow-500/5 border border-yellow-500/20 rounded-3xl p-6 lg:p-8 relative overflow-hidden">
+          <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"/>
+          <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="p-3 bg-yellow-500/20 text-yellow-400 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+              <i className="fa-solid fa-inbox"/>
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Solicitações do Juan</h2>
+              <p className="text-sm text-gray-400">Aguardando aprovação e triagem do Marketing</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+            {inboxTasks.map(task => {
+              const cl = clienteById(task.clientId);
+              const nComs = getComs(task.id).length;
+              return (
+                <div key={task.id} className="bg-gray-900/60 border border-yellow-500/20 p-5 rounded-2xl flex flex-col justify-between hover:border-yellow-500/40 transition-colors">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <i className="fa-solid fa-wand-magic-sparkles text-fuchsia-400"></i>
-                      <span className="text-sm font-semibold tracking-wider text-fuchsia-400 uppercase">Tráfego Studio</span>
+                    <div className="flex justify-between items-start mb-3">
+                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                      {task.prioridade && task.prioridade!=='Normal' && (
+                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md border flex items-center gap-1 ${prioridadeCor(task.prioridade)}`}>
+                          {task.prioridade==='Urgente'?'🔴':'🟠'} {task.prioridade}
+                        </span>
+                      )}
                     </div>
-                    <h1 className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-500 tracking-tight">
-                      Central de Produção
-                    </h1>
-                    <p className="text-gray-400 mt-2 flex items-center gap-2">
-                      <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                      </span>
-                      Salvo localmente no navegador
-                    </p>
+                    <h4 className="text-white font-semibold mb-1">{task.title}</h4>
+                    {task.solicitante && <p className="text-xs text-gray-500 mb-1"><i className="fa-regular fa-user mr-1"/>{task.solicitante}</p>}
+                    <p className="text-xs text-gray-400">Prazo: <strong className="text-gray-300">{task.deadline}</strong>{task.platform&&<span className="text-gray-500"> · {task.platform}</span>}</p>
                   </div>
-
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {/* Contador Solicitações */}
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl px-5 py-3 backdrop-blur-md cursor-pointer hover:bg-yellow-500/20 transition-colors" onClick={() => window.scrollTo({top:0,behavior:'smooth'})}>
-                      <div className="text-2xl font-bold text-yellow-400">{inboxTasks.length < 10 ? `0${inboxTasks.length}` : inboxTasks.length}</div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Solicitações</div>
-                    </div>
-                    {/* Contador Em Foco */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 backdrop-blur-md">
-                      <div className="text-2xl font-bold text-white">{doingTasks.length < 10 ? `0${doingTasks.length}` : doingTasks.length}</div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Em Foco</div>
-                    </div>
-                    {/* Botão Nova Demanda */}
-                    <button
-                      onClick={() => setIsNovaDemandaOpen(true)}
-                      className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50 px-5 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg hover:shadow-purple-500/30 hover:-translate-y-0.5"
-                    >
-                      <i className="fa-solid fa-plus"></i> Nova Demanda
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={()=>aprovarParaFila(task.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/30 py-2.5 rounded-xl text-xs font-bold transition-all">
+                      <i className="fa-solid fa-check"/> Aprovar p/ Fila
+                    </button>
+                    <button onClick={()=>abrirComs(task.id)}
+                      className="relative bg-white/5 hover:bg-purple-500/20 text-gray-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 px-3 rounded-xl text-xs transition-all">
+                      <i className="fa-solid fa-comments"/>
+                      {nComs>0&&<span className="absolute -top-1.5 -right-1.5 bg-purple-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">{nComs}</span>}
+                    </button>
+                    <button onClick={()=>abrirEdicao(task)}
+                      className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 px-3 rounded-xl text-xs transition-all">
+                      <i className="fa-regular fa-pen-to-square"/>
                     </button>
                   </div>
-                </header>
-
-                {/* ===== SOLICITAÇÕES DO JUAN (INBOX) ===== */}
-                <section className="bg-yellow-500/5 border border-yellow-500/20 rounded-3xl p-6 lg:p-8 relative overflow-hidden">
-                  <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                  
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-yellow-500/20 text-yellow-400 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.2)] flex items-center justify-center">
-                        <i className="fa-solid fa-inbox"></i>
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-white">Solicitações do Juan</h2>
-                        <p className="text-sm text-gray-400">Aguardando aprovação e triagem do Marketing</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
-                    {inboxTasks.map(task => (
-                      <div key={task.id} className="bg-gray-900/60 border border-yellow-500/20 p-5 rounded-2xl flex flex-col justify-between hover:border-yellow-500/40 transition-colors shadow-sm">
-                        <div>
-                          <div className="flex justify-between items-start mb-3">
-                            <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${task.client.bg} ${task.client.text} border ${task.client.border}`}>
-                              {task.client.name}
-                            </span>
-                            {task.prioridade && task.prioridade !== 'Normal' && (
-                              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border flex items-center gap-1 ${prioridadeCor(task.prioridade)}`}>
-                                {task.prioridade === 'Urgente' ? '🔴' : '🟠'} {task.prioridade}
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="text-white font-semibold mb-1">{task.title}</h4>
-                          {task.solicitante && <p className="text-xs text-gray-500 mb-1"><i className="fa-regular fa-user mr-1"></i>{task.solicitante}</p>}
-                          <p className="text-xs text-gray-400">Prazo: <strong className="text-gray-300">{task.deadline}</strong>{task.platform && <span className="text-gray-500"> · {task.platform}</span>}</p>
-                        </div>
-                        
-                        <div className="flex gap-2 mt-4">
-                          <button 
-                            onClick={() => aprovarParaFila(task.id)}
-                            className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/30 py-2.5 rounded-xl text-xs font-bold transition-all group"
-                          >
-                            <i className="fa-solid fa-check group-hover:scale-125 transition-transform"></i> Aprovar p/ Fila
-                          </button>
-                          <button onClick={() => abrirEdicaoTarefa(task)} className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 px-3 rounded-xl text-xs transition-all">
-                            <i className="fa-regular fa-pen-to-square"></i>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    {inboxTasks.length === 0 && (
-                      <div className="col-span-full py-8 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
-                        <p className="text-gray-500">Nenhuma solicitação pendente. Caixa de entrada zerada! 🎉</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* ===== ESTEIRA + CRIATIVOS ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                  
-                  {/* Em Foco */}
-                  <section className="lg:col-span-7 space-y-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-orange-500/20 text-orange-400 rounded-lg flex items-center justify-center">
-                        <i className="fa-solid fa-fire"></i>
-                      </div>
-                      <h2 className="text-2xl font-bold text-white">Esteira de Produção</h2>
-                    </div>
-                    
-                    <div className="grid gap-5">
-                      {doingTasks.map(task => (
-                        <div key={task.id} className="relative group rounded-3xl bg-gray-900/50 border border-white/5 p-1 overflow-hidden backdrop-blur-sm hover:border-white/20 transition-all duration-500">
-                          <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${task.client.theme}`}></div>
-                          <div className="p-6">
-                            <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${task.client.bg} ${task.client.text} border ${task.client.border}`}>
-                                  {task.client.name}
-                                </span>
-                                {task.solicitante && <span className="text-xs text-gray-500"><i className="fa-regular fa-user mr-1"></i>{task.solicitante}</span>}
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 bg-black/40 px-3 py-1 rounded-full">
-                                  <i className="fa-regular fa-clock text-orange-400"></i> Entrega: {task.deadline}
-                                </span>
-                                <button onClick={() => abrirEdicaoTarefa(task)} className="bg-white/5 hover:bg-white/10 text-gray-300 px-3 py-1 rounded-full text-xs font-bold transition-colors border border-white/10">
-                                  <i className="fa-solid fa-pen mr-1"></i>Editar
-                                </button>
-                              </div>
-                            </div>
-                            
-                            <h3 className="text-xl font-bold text-white mb-4 pr-4">{task.title}</h3>
-                            
-                            <div className="flex items-center gap-4 mb-6 bg-black/30 p-3 rounded-xl border border-white/5 flex-wrap">
-                              <div className="flex flex-col">
-                                <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Iniciado em</span>
-                                <span className="text-sm font-semibold text-gray-300">{task.startDate ? new Date(task.startDate + 'T12:00:00').toLocaleDateString('pt-BR') : 'Não definido'}</span>
-                              </div>
-                              <div className="w-px h-8 bg-white/10"></div>
-                              <div className="flex flex-col">
-                                <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Tempo na Esteira</span>
-                                <span className="text-sm font-bold text-orange-400">{getTempoDecorrido(task.startDate)}</span>
-                              </div>
-                              {task.platform && <>
-                                <div className="w-px h-8 bg-white/10"></div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Plataforma</span>
-                                  <span className="text-sm font-semibold text-gray-300">{task.platform}</span>
-                                </div>
-                              </>}
-                            </div>
-                            
-                            <div className="space-y-2 mb-6">
-                              <div className="flex justify-between text-xs text-gray-400 font-medium">
-                                <span>Progresso da Demanda</span>
-                                <span className={task.client.text}>{task.progress || 0}%</span>
-                              </div>
-                              <div className="w-full bg-black/50 rounded-full h-2.5 overflow-hidden">
-                                <div 
-                                  className={`h-2.5 rounded-full bg-gradient-to-r ${task.client.theme} relative`}
-                                  style={{ width: `${task.progress || 0}%` }}
-                                >
-                                  <div className="absolute top-0 right-0 bottom-0 w-4 bg-white/30 animate-pulse"></div>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Mural */}
-                            <div className={`p-1 rounded-2xl bg-gradient-to-br ${task.client.theme} shadow-lg shadow-black/20`}>
-                              <div className="bg-black/40 backdrop-blur-md rounded-xl p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                                    <i className="fa-solid fa-pen-to-square"></i> Observações / Mural
-                                  </span>
-                                </div>
-                                <textarea 
-                                  className="w-full bg-black/20 text-white placeholder-white/50 text-sm p-3 rounded-lg border border-white/10 outline-none focus:border-white/40 focus:bg-black/40 transition-all resize-y min-h-[80px]"
-                                  placeholder="Escreva aqui suas ideias, o que a equipe disse, links úteis..."
-                                  value={task.notes || ''}
-                                  onChange={(e) => atualizarNotaTarefa(task.id, e.target.value)}
-                                  onBlur={() => salvarNotaFinal(task)}
-                                />
-                                {/* Botões: Comentários + Finalizar */}
-                                <div className="flex gap-3 mt-4">
-                                  <button
-                                    onClick={() => abrirComentarios(task.id)}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-purple-600/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 hover:border-purple-500/40 py-2.5 rounded-xl text-xs font-bold transition-all relative"
-                                  >
-                                    <i className="fa-solid fa-comments"></i> Comentários
-                                    {getComentariosDaTarefa(task.id).length > 0 && (
-                                      <span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
-                                        {getComentariosDaTarefa(task.id).length}
-                                      </span>
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => moverParaFinalizado(task.id)}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 py-2.5 rounded-xl text-xs font-bold transition-all"
-                                  >
-                                    <i className="fa-solid fa-check-double"></i> Finalizar
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {doingTasks.length === 0 && <p className="text-center text-gray-500 py-4 text-sm">Nenhuma tarefa em foco no momento.</p>}
-                    </div>
-                  </section>
-
-                  {/* Criativos + Esteira */}
-                  <section className="lg:col-span-5 space-y-8">
-                    {/* Fábrica de Criativos */}
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-3 bg-fuchsia-500/20 text-fuchsia-400 rounded-lg flex items-center justify-center">
-                            <i className="fa-solid fa-palette"></i>
-                          </div>
-                          <h2 className="text-xl font-bold text-white">Fábrica de Criativos</h2>
-                        </div>
-                        <button 
-                          onClick={() => setIsCreativeModalOpen(true)}
-                          className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          <i className="fa-solid fa-plus"></i> Solicitar
-                        </button>
-                      </div>
-
-                      <div className="bg-fuchsia-900/10 border border-fuchsia-500/20 rounded-3xl p-4 space-y-4 backdrop-blur-sm">
-                        {criativos.map(criativo => (
-                          <div key={criativo.id} className="bg-gray-900/80 border border-white/5 p-4 rounded-2xl relative group">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${criativo.client.bg} ${criativo.client.text} border ${criativo.client.border}`}>
-                                {criativo.client.name}
-                              </span>
-                            </div>
-                            <h4 className="font-bold text-white text-sm mb-1">{criativo.title}</h4>
-                            <p className="text-xs text-gray-400 mb-3 line-clamp-2">{criativo.content}</p>
-                            
-                            {criativo.link && (
-                              <a href={criativo.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-md mb-3 border border-blue-500/20">
-                                <i className="fa-solid fa-link"></i> Link / Referência
-                              </a>
-                            )}
-                            
-                            <button 
-                              onClick={() => deleteData('criativos', criativo.id)}
-                              className="w-full py-1.5 rounded-lg border border-white/10 text-xs text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all flex items-center justify-center gap-2"
-                            >
-                              <i className="fa-solid fa-check"></i> Marcar como Entregue
-                            </button>
-                          </div>
-                        ))}
-                        {criativos.length === 0 && (
-                          <p className="text-center text-gray-500 text-sm py-4">Nenhum criativo na fila.</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Esteira / Fila */}
-                    <div className="space-y-6 pt-4 border-t border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="p-3 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center">
-                          <i className="fa-solid fa-chart-line"></i>
-                        </div>
-                        <h2 className="text-xl font-bold text-white">Esteira / Demandas</h2>
-                      </div>
-                      <div className="bg-gray-900/30 border border-white/5 rounded-3xl p-2 backdrop-blur-sm max-h-[400px] overflow-y-auto">
-                        {queueTasks.map((task) => (
-                          <div key={task.id} className="group p-4 flex items-center justify-between hover:bg-white/5 rounded-2xl transition-colors cursor-default border-b border-white/5 last:border-0">
-                            <div className="flex items-center gap-4">
-                              <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)] bg-gradient-to-r ${task.client.theme}`}></div>
-                              <div>
-                                <h4 className="text-sm font-semibold text-gray-200 group-hover:text-white transition-colors">{task.title}</h4>
-                                <p className={`text-xs mt-1 ${task.client.text}`}>{task.client.name} • <span className="text-gray-500">{task.platform}</span></p>
-                              </div>
-                            </div>
-                            <div className="text-right flex items-center gap-2">
-                              <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded-md border border-white/5">{task.status === 'review' ? 'Aprovação' : 'Fila'}</span>
-                              <button onClick={() => abrirEdicaoTarefa(task)} className="opacity-0 group-hover:opacity-100 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded text-xs transition-all">
-                                <i className="fa-solid fa-play"></i> Iniciar
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        {queueTasks.length === 0 && <p className="text-center text-gray-500 py-4 text-sm">Nenhuma demanda na esteira.</p>}
-                      </div>
-                    </div>
-                  </section>
                 </div>
+              );
+            })}
+            {inboxTasks.length===0&&(
+              <div className="col-span-full py-8 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
+                <p className="text-gray-500">Caixa de entrada zerada! 🎉</p>
+              </div>
+            )}
+          </div>
+        </section>
 
-                {/* ===== FINALIZADAS ===== */}
-                <section className="pt-10 border-t border-white/5 space-y-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center">
-                      <i className="fa-solid fa-check-double"></i>
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Projetos & Demandas Finalizadas</h2>
-                      <p className="text-sm text-gray-400">Histórico de entregas recentes.</p>
-                    </div>
-                  </div>
+        {/* ═══ ESTEIRA + LATERAL ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {doneTasks.map(task => (
-                      <div key={task.id} className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 opacity-80 hover:opacity-100 transition-opacity">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
-                          <i className="fa-solid fa-check"></i>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white line-clamp-1">{task.title}</h4>
-                          <p className={`text-xs mt-0.5 font-semibold uppercase tracking-wider ${task.client.text}`}>{task.client.name}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {doneTasks.length === 0 && (
-                      <div className="col-span-full py-10 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
-                        <p className="text-gray-500">Nenhum projeto finalizado ainda.</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
+          {/* ESTEIRA DE PRODUÇÃO */}
+          <section className="lg:col-span-7 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-orange-500/20 text-orange-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-fire"/></div>
+              <h2 className="text-2xl font-bold text-white">Esteira de Produção</h2>
+            </div>
 
-                {/* ===== CAMPANHAS NO AR ===== */}
-                <section className="pt-10 border-t border-white/5 space-y-8">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-green-500/20 text-green-400 rounded-lg flex items-center justify-center">
-                        <i className="fa-solid fa-bolt"></i>
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-white">Campanhas no Ar</h2>
-                        <p className="text-sm text-gray-400">Anúncios cadastrados manualmente para vitrine.</p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-                      <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md">
-                        {Object.values(CLIENTES).map(client => (
-                          <button 
-                            key={client.id}
-                            onClick={() => setActiveAdTab(client.id)}
-                            className={`relative px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                              activeAdTab === client.id 
-                                ? `${client.bg} ${client.text} shadow-[0_0_20px_rgba(0,0,0,0.5)]` 
-                                : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-                            }`}
-                          >
-                            {client.name}
-                          </button>
-                        ))}
-                      </div>
-                      
-                      <button 
-                        onClick={() => setIsAdModalOpen(true)}
-                        className="bg-green-600/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
-                      >
-                        <i className="fa-solid fa-plus"></i> Cadastrar Anúncio
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {anuncios.filter(ad => ad.client === activeAdTab).map(ad => {
-                      const clientData = clienteById(ad.client);
-                      return (
-                        <div key={ad.id} className="group flex flex-col bg-gray-900/40 border border-white/10 rounded-3xl overflow-hidden hover:border-white/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50">
-                          <div className="h-48 relative bg-black/50 flex items-center justify-center overflow-hidden">
-                            {ad.imageUrl ? (
-                              <>
-                                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent z-10"></div>
-                                <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105" />
-                              </>
-                            ) : (
-                              <div className="text-center z-10">
-                                <i className="fa-regular fa-image text-4xl text-gray-600 mb-2"></i>
-                                <span className="text-xs text-gray-500 uppercase tracking-wider font-bold block">Sem imagem</span>
-                              </div>
-                            )}
-                            <div className="absolute top-4 left-4 z-20">
-                              <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[10px] uppercase font-black px-3 py-1.5 rounded-full flex items-center backdrop-blur-md">
-                                <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2 animate-pulse"></span> Rodando
-                              </span>
-                            </div>
-                            <div className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-md p-2 rounded-xl border border-white/10 text-gray-300">
-                              {ad.platform === 'Meta' ? <i className="fa-brands fa-facebook text-blue-400"></i> : <i className="fa-solid fa-magnifying-glass text-red-400"></i>}
-                            </div>
-                          </div>
-                          
-                          <div className="p-6 flex-1 flex flex-col z-10 bg-gray-900/60 backdrop-blur-xl">
-                            <h4 className="text-lg font-bold text-white mb-4 line-clamp-1">{ad.title}</h4>
-                            <div className={`p-4 rounded-2xl bg-black/40 border border-white/5 flex-1 relative mb-4`}>
-                              <div className={`absolute top-0 left-4 w-8 h-1 bg-gradient-to-r ${clientData.theme} rounded-b-full`}></div>
-                              <p className="text-sm text-gray-400 leading-relaxed italic line-clamp-4">"{ad.copy}"</p>
-                            </div>
-                            <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-center">
-                              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{ad.platform}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {anuncios.filter(ad => ad.client === activeAdTab).length === 0 && (
-                      <div className="col-span-full py-20 text-center border border-white/5 border-dashed rounded-3xl bg-white/[0.02]">
-                        <p className="text-gray-500 text-lg">Nenhum anúncio cadastrado no momento.</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-              </main>
-
-              {/* ===== MODAL: COMENTÁRIOS ===== */}
-              {comentarioTaskId && (() => {
-                const taskComentada = tasks.find(t => String(t.id) === comentarioTaskId);
-                const listaComs = getComentariosDaTarefa(comentarioTaskId);
+            <div className="grid gap-5">
+              {doingTasks.map(task => {
+                const cl = clienteById(task.clientId);
+                const nComs = getComs(task.id).length;
                 return (
-                  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={fecharComentarios}>
-                    <div
-                      className="bg-[#0d1220] border border-purple-500/30 rounded-t-3xl md:rounded-3xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[85vh]"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      {/* Header do modal */}
-                      <div className="flex items-center justify-between p-6 border-b border-white/5">
-                        <div>
-                          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                            <i className="fa-solid fa-comments text-purple-400"></i> Comentários
-                          </h2>
-                          {taskComentada && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{taskComentada.title}</p>}
+                  <div key={task.id} className="relative rounded-3xl bg-gray-900/50 border border-white/5 p-1 overflow-hidden backdrop-blur-sm hover:border-white/20 transition-all duration-500">
+                    <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${cl.theme}`}/>
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                          {task.solicitante&&<span className="text-xs text-gray-500"><i className="fa-regular fa-user mr-1"/>{task.solicitante}</span>}
                         </div>
-                        <button onClick={fecharComentarios} className="text-gray-500 hover:text-white transition-colors">
-                          <i className="fa-solid fa-xmark text-xl"></i>
-                        </button>
-                      </div>
-
-                      {/* Lista de comentários */}
-                      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                        {listaComs.length === 0 && (
-                          <div className="text-center py-10">
-                            <i className="fa-regular fa-comment-dots text-4xl text-gray-700 mb-3 block"></i>
-                            <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
-                            <p className="text-gray-600 text-xs mt-1">Seja o primeiro a comentar!</p>
-                          </div>
-                        )}
-                        {listaComs.map(com => (
-                          <div key={com.id} className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                              <i className="fa-solid fa-user text-purple-400 text-xs"></i>
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-xs font-bold text-purple-300">{com.autor}</span>
-                                <span className="text-[10px] text-gray-600">{com.data}</span>
-                              </div>
-                              <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3">
-                                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{com.texto}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Input novo comentário */}
-                      <div className="p-4 border-t border-white/5">
-                        <form onSubmit={adicionarComentario} className="flex gap-3">
-                          <textarea
-                            rows="1"
-                            placeholder="Escreva um comentário..."
-                            className="flex-1 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-purple-500/50 placeholder-gray-600 resize-none"
-                            value={novoComentario}
-                            onChange={e => setNovoComentario(e.target.value)}
-                            onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) adicionarComentario(e); }}
-                          />
-                          <button
-                            type="submit"
-                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 rounded-2xl font-bold transition-colors flex items-center justify-center"
-                          >
-                            <i className="fa-solid fa-paper-plane"></i>
+                        <div className="flex gap-2">
+                          <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-black/40 px-3 py-1 rounded-full">
+                            <i className="fa-regular fa-clock text-orange-400"/> {task.deadline}
+                          </span>
+                          <button onClick={()=>abrirEdicao(task)} className="bg-white/5 hover:bg-white/10 text-gray-300 px-3 py-1 rounded-full text-xs font-bold transition-colors border border-white/10">
+                            <i className="fa-solid fa-pen mr-1"/>Editar
                           </button>
-                        </form>
-                        <p className="text-[10px] text-gray-600 mt-2 text-center">Enter para enviar · Shift+Enter para nova linha</p>
+                        </div>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-white mb-4 pr-4">{task.title}</h3>
+
+                      <div className="flex items-center gap-4 mb-6 bg-black/30 p-3 rounded-xl border border-white/5 flex-wrap">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Iniciado em</span>
+                          <span className="text-sm font-semibold text-gray-300">{task.startDate?new Date(task.startDate+'T12:00:00').toLocaleDateString('pt-BR'):'Não definido'}</span>
+                        </div>
+                        <div className="w-px h-8 bg-white/10"/>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Tempo na Esteira</span>
+                          <span className="text-sm font-bold text-orange-400">{getTempoDecorrido(task.startDate)}</span>
+                        </div>
+                        {task.platform&&<><div className="w-px h-8 bg-white/10"/>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Plataforma</span>
+                          <span className="text-sm font-semibold text-gray-300">{task.platform}</span>
+                        </div></>}
+                      </div>
+
+                      <div className="space-y-2 mb-6">
+                        <div className="flex justify-between text-xs text-gray-400 font-medium">
+                          <span>Progresso da Demanda</span>
+                          <span className={cl.text}>{task.progress||0}%</span>
+                        </div>
+                        <div className="w-full bg-black/50 rounded-full h-2.5 overflow-hidden">
+                          <div className={`h-2.5 rounded-full bg-gradient-to-r ${cl.theme} relative`} style={{width:`${task.progress||0}%`}}>
+                            <div className="absolute top-0 right-0 bottom-0 w-4 bg-white/30 animate-pulse"/>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mural */}
+                      <div className={`p-1 rounded-2xl bg-gradient-to-br ${cl.theme} shadow-lg shadow-black/20`}>
+                        <div className="bg-black/40 backdrop-blur-md rounded-xl p-3">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-2">
+                            <i className="fa-solid fa-pen-to-square"/> Observações / Mural
+                          </span>
+                          <textarea
+                            className="w-full bg-black/20 text-white placeholder-white/50 text-sm p-3 rounded-lg border border-white/10 outline-none focus:border-white/40 transition-all resize-y min-h-[70px]"
+                            placeholder="Escreva aqui suas ideias, links úteis..."
+                            value={task.notes||''}
+                            onChange={e=>atualizarNota(task.id,e.target.value)}
+                            onBlur={()=>salvarNota(task)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botões */}
+                      <div className="flex gap-3 mt-4">
+                        <button onClick={()=>abrirComs(task.id)}
+                          className="flex-1 relative flex items-center justify-center gap-2 bg-purple-600/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 hover:border-purple-500/40 py-2.5 rounded-xl text-xs font-bold transition-all">
+                          <i className="fa-solid fa-comments"/> Comentários
+                          {nComs>0&&<span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{nComs}</span>}
+                        </button>
+                        <button onClick={()=>moverParaFinalizado(task.id)}
+                          className="flex-1 flex items-center justify-center gap-2 bg-emerald-600/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 py-2.5 rounded-xl text-xs font-bold transition-all">
+                          <i className="fa-solid fa-check-double"/> Finalizar
+                        </button>
                       </div>
                     </div>
                   </div>
                 );
-              })()}
-
-              {/* ======================================= */}
-              {/* MODAL: NOVA DEMANDA (COMPLETO)          */}
-              {/* ======================================= */}
-              {isNovaDemandaOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className="bg-[#0f1523] border border-purple-500/30 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
-                    <button onClick={() => { setIsNovaDemandaOpen(false); setNovaDemanda({...NOVA_DEMANDA_VAZIA}); }} className="absolute top-6 right-6 text-gray-500 hover:text-white">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                      <i className="fa-solid fa-plus text-purple-500"></i> Nova Demanda
-                    </h2>
-                    <form onSubmit={handleCriarDemanda} className="space-y-4">
-                      {/* Título */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Título da Demanda *</label>
-                        <input 
-                          required type="text" placeholder="Ex: Campanha Dia dos Namorados"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 placeholder-gray-600"
-                          value={novaDemanda.title} onChange={e => setNovaDemanda({...novaDemanda, title: e.target.value})}
-                        />
-                      </div>
-
-                      {/* Cliente + Solicitante */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cliente *</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50"
-                            value={novaDemanda.client} onChange={e => setNovaDemanda({...novaDemanda, client: e.target.value})}
-                          >
-                            {Object.values(CLIENTES).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Solicitante</label>
-                          <input 
-                            type="text" placeholder="Ex: Juan, Ana..."
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 placeholder-gray-600"
-                            value={novaDemanda.solicitante} onChange={e => setNovaDemanda({...novaDemanda, solicitante: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Responsável */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Responsável (Marketing)</label>
-                        <input 
-                          type="text" placeholder="Ex: Ana Silva, Marina..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 placeholder-gray-600"
-                          value={novaDemanda.responsavel} onChange={e => setNovaDemanda({...novaDemanda, responsavel: e.target.value})}
-                        />
-                      </div>
-
-                      {/* Status + Prioridade */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status Inicial</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50"
-                            value={novaDemanda.status} onChange={e => setNovaDemanda({...novaDemanda, status: e.target.value})}
-                          >
-                            <option value="inbox">Inbox (Aguardando Triagem)</option>
-                            <option value="todo">Fila de Produção</option>
-                            <option value="doing">Em Foco / Produção</option>
-                            <option value="review">Revisão / Aprovação</option>
-                            <option value="done">Finalizado / Entregue</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Prioridade</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50"
-                            value={novaDemanda.prioridade} onChange={e => setNovaDemanda({...novaDemanda, prioridade: e.target.value})}
-                          >
-                            <option value="Normal">Normal</option>
-                            <option value="Alta">Alta</option>
-                            <option value="Urgente">Urgente 🔴</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Plataforma + Prazo */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Plataforma</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50"
-                            value={novaDemanda.platform} onChange={e => setNovaDemanda({...novaDemanda, platform: e.target.value})}
-                          >
-                            <option>Meta Ads</option>
-                            <option>Google Ads</option>
-                            <option>TikTok Ads</option>
-                            <option>YouTube</option>
-                            <option>LinkedIn</option>
-                            <option>Site/LP</option>
-                            <option>Data Studio</option>
-                            <option>Outros</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Prazo *</label>
-                          <input 
-                            required type="text" placeholder="15/05 ou Urgente"
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 placeholder-gray-600"
-                            value={novaDemanda.deadline} onChange={e => setNovaDemanda({...novaDemanda, deadline: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Data Início */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Data de Início</label>
-                        <input 
-                          type="date"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50"
-                          value={novaDemanda.startDate} onChange={e => setNovaDemanda({...novaDemanda, startDate: e.target.value})}
-                        />
-                      </div>
-
-                      {/* Progresso */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Progresso: <span className="text-purple-400">{novaDemanda.progress}%</span></label>
-                        <input 
-                          type="range" min="0" max="100"
-                          className="w-full"
-                          value={novaDemanda.progress} onChange={e => setNovaDemanda({...novaDemanda, progress: e.target.value})}
-                        />
-                      </div>
-
-                      {/* Observações */}
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Observações (Opcional)</label>
-                        <textarea 
-                          rows="3" placeholder="Notas, links, contexto..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-purple-500/50 placeholder-gray-600"
-                          value={novaDemanda.notes} onChange={e => setNovaDemanda({...novaDemanda, notes: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => { setIsNovaDemandaOpen(false); setNovaDemanda({...NOVA_DEMANDA_VAZIA}); }} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">
-                          Cancelar
-                        </button>
-                        <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors">
-                          <i className="fa-solid fa-plus mr-2"></i>Criar Demanda
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== MODAL: SOLICITAR CRIATIVO ===== */}
-              {isCreativeModalOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className="bg-[#0f1523] border border-fuchsia-500/30 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative">
-                    <button onClick={() => setIsCreativeModalOpen(false)} className="absolute top-6 right-6 text-gray-500 hover:text-white">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                      <i className="fa-solid fa-palette text-fuchsia-500"></i> Solicitar Criativo
-                    </h2>
-                    <form onSubmit={handleAddCreative} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Título do Criativo</label>
-                        <input 
-                          required type="text"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500/50"
-                          value={newCreative.title} onChange={e => setNewCreative({...newCreative, title: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cliente</label>
-                        <select 
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500/50"
-                          value={newCreative.client} onChange={e => setNewCreative({...newCreative, client: e.target.value})}
-                        >
-                          {Object.values(CLIENTES).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Briefing / Conteúdo</label>
-                        <textarea 
-                          required rows="3"
-                          placeholder="Descreva o que precisa: formato, estilo, referências, mensagem principal..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500/50 placeholder-gray-600"
-                          value={newCreative.content} onChange={e => setNewCreative({...newCreative, content: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Link de Referência (Opcional)</label>
-                        <input 
-                          type="url" placeholder="https://drive.google.com/..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-fuchsia-500/50 placeholder-gray-600"
-                          value={newCreative.link} onChange={e => setNewCreative({...newCreative, link: e.target.value})}
-                        />
-                      </div>
-                      <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setIsCreativeModalOpen(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">
-                          Cancelar
-                        </button>
-                        <button type="submit" className="flex-1 bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl transition-colors">
-                          Solicitar
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== MODAL: CADASTRAR ANÚNCIO ===== */}
-              {isAdModalOpen && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className="bg-[#0f1523] border border-green-500/30 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
-                    <button onClick={() => setIsAdModalOpen(false)} className="absolute top-6 right-6 text-gray-500 hover:text-white">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                      <i className="fa-solid fa-bolt text-green-500"></i> Cadastrar Anúncio Ativo
-                    </h2>
-                    <form onSubmit={handleAddAd} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cliente</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-green-500/50"
-                            value={newAd.client} onChange={e => setNewAd({...newAd, client: e.target.value})}
-                          >
-                            {Object.values(CLIENTES).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Plataforma</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-green-500/50"
-                            value={newAd.platform} onChange={e => setNewAd({...newAd, platform: e.target.value})}
-                          >
-                            <option value="Meta">Meta Ads</option>
-                            <option value="Google">Google Ads</option>
-                            <option value="TikTok">TikTok Ads</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Nome do Anúncio</label>
-                        <input 
-                          required type="text" placeholder="Ex: Carrossel Dia das Mães"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-green-500/50 placeholder-gray-600"
-                          value={newAd.title} onChange={e => setNewAd({...newAd, title: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Copy (Texto do Anúncio)</label>
-                        <textarea 
-                          required rows="3"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-green-500/50"
-                          value={newAd.copy} onChange={e => setNewAd({...newAd, copy: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Link da Imagem (Opcional)</label>
-                        <input 
-                          type="url" placeholder="https://..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-green-500/50 placeholder-gray-600"
-                          value={newAd.imageUrl} onChange={e => setNewAd({...newAd, imageUrl: e.target.value})}
-                        />
-                      </div>
-                      <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={() => setIsAdModalOpen(false)} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">
-                          Cancelar
-                        </button>
-                        <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition-colors">
-                          Publicar no Painel
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ===== MODAL: EDITAR TAREFA ===== */}
-              {isEditTaskModalOpen && editingTask && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                  <div className="bg-[#0f1523] border border-blue-500/30 rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[90vh] overflow-y-auto">
-                    <button onClick={() => setIsEditTaskModalOpen(false)} className="absolute top-6 right-6 text-gray-500 hover:text-white">
-                      <i className="fa-solid fa-xmark text-xl"></i>
-                    </button>
-                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                      <i className="fa-solid fa-pen-to-square text-blue-500"></i> Editar Demanda
-                    </h2>
-                    <form onSubmit={salvarEdicaoTarefa} className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Título</label>
-                        <input 
-                          required type="text"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                          value={editingTask.title} onChange={e => setEditingTask({...editingTask, title: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Cliente</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                            value={editingTask.client?.id || 'moteis'} 
-                            onChange={e => setEditingTask({...editingTask, client: clienteById(e.target.value)})}
-                          >
-                            {Object.values(CLIENTES).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Solicitante</label>
-                          <input 
-                            type="text" placeholder="Ex: Juan"
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50 placeholder-gray-600"
-                            value={editingTask.solicitante || ''} onChange={e => setEditingTask({...editingTask, solicitante: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Responsável (Marketing)</label>
-                        <input 
-                          type="text" placeholder="Ex: Ana Silva, Marina"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50 placeholder-gray-600"
-                          value={editingTask.responsavel || ''} onChange={e => setEditingTask({...editingTask, responsavel: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Status</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                            value={editingTask.status} onChange={e => setEditingTask({...editingTask, status: e.target.value})}
-                          >
-                            <option value="inbox">Inbox</option>
-                            <option value="todo">Fila (A Fazer)</option>
-                            <option value="doing">Em Foco (Tráfego)</option>
-                            <option value="review">Em Aprovação</option>
-                            <option value="done">Finalizado</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Prioridade</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                            value={editingTask.prioridade || 'Normal'} onChange={e => setEditingTask({...editingTask, prioridade: e.target.value})}
-                          >
-                            <option value="Normal">Normal</option>
-                            <option value="Alta">Alta</option>
-                            <option value="Urgente">Urgente 🔴</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Plataforma</label>
-                          <select 
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                            value={editingTask.platform || 'Meta Ads'} onChange={e => setEditingTask({...editingTask, platform: e.target.value})}
-                          >
-                            <option>Meta Ads</option>
-                            <option>Google Ads</option>
-                            <option>TikTok Ads</option>
-                            <option>YouTube</option>
-                            <option>LinkedIn</option>
-                            <option>Site/LP</option>
-                            <option>Data Studio</option>
-                            <option>Outros</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Prazo Final</label>
-                          <input 
-                            type="text" placeholder="Ex: 10/05 ou Hoje"
-                            className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50 placeholder-gray-600"
-                            value={editingTask.deadline || ''} onChange={e => setEditingTask({...editingTask, deadline: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Data de Início</label>
-                        <input 
-                          type="date"
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50"
-                          value={editingTask.startDate || ''} onChange={e => setEditingTask({...editingTask, startDate: e.target.value})}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Progresso: <span className="text-blue-400">{editingTask.progress || 0}%</span></label>
-                        <input 
-                          type="range" min="0" max="100"
-                          className="w-full"
-                          value={editingTask.progress || 0} onChange={e => setEditingTask({...editingTask, progress: parseInt(e.target.value)})}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Observações</label>
-                        <textarea 
-                          rows="3" placeholder="Notas, links, contexto..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-blue-500/50 placeholder-gray-600"
-                          value={editingTask.notes || ''} onChange={e => setEditingTask({...editingTask, notes: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
-                        <button type="button" onClick={() => { deleteData('tasks', editingTask.id); setIsEditTaskModalOpen(false); }} className="bg-red-600/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 p-3 rounded-xl transition-colors">
-                          <i className="fa-solid fa-trash"></i>
-                        </button>
-                        <button type="button" onClick={() => moverParaFinalizado(editingTask.id)} className="flex-1 bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold py-3 rounded-xl transition-colors">
-                          <i className="fa-solid fa-check-double mr-2"></i>Finalizar
-                        </button>
-                        <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">
-                          <i className="fa-solid fa-floppy-disk mr-2"></i>Salvar
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
+              })}
+              {doingTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma tarefa em foco no momento.</p>}
             </div>
-          );
-        }
+          </section>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+          {/* LATERAL: CRIATIVOS + FILA */}
+          <section className="lg:col-span-5 space-y-8">
+
+            {/* Fábrica de Criativos */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-fuchsia-500/20 text-fuchsia-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-palette"/></div>
+                  <h2 className="text-xl font-bold text-white">Fábrica de Criativos</h2>
+                </div>
+                <button onClick={()=>{ setNewCreative({title:'CRIATIVO NOVO: ',content:'',clientId:clientes[0]?.id||'',link:''}); setModal('criativo'); }}
+                  className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2">
+                  <i className="fa-solid fa-plus"/> Solicitar
+                </button>
+              </div>
+
+              <div className="bg-fuchsia-900/10 border border-fuchsia-500/20 rounded-3xl p-4 space-y-4 backdrop-blur-sm">
+                {criativos.map(cr => {
+                  const cl = clienteById(cr.clientId);
+                  return (
+                    <div key={cr.id} className="bg-gray-900/80 border border-white/5 p-4 rounded-2xl">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                      </div>
+                      <h4 className="font-bold text-white text-sm mb-1">{cr.title}</h4>
+                      <p className="text-xs text-gray-400 mb-3 line-clamp-2">{cr.content}</p>
+                      {cr.link&&<a href={cr.link} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-md mb-3 border border-blue-500/20">
+                        <i className="fa-solid fa-link"/> Link / Referência
+                      </a>}
+                      <button onClick={()=>delFromList(setCriativos,'criativos',cr.id)}
+                        className="w-full py-1.5 rounded-lg border border-white/10 text-xs text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all flex items-center justify-center gap-2">
+                        <i className="fa-solid fa-check"/> Marcar como Entregue
+                      </button>
+                    </div>
+                  );
+                })}
+                {criativos.length===0&&<p className="text-center text-gray-500 text-sm py-4">Nenhum criativo na fila.</p>}
+              </div>
+            </div>
+
+            {/* Esteira / Fila */}
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-chart-line"/></div>
+                <h2 className="text-xl font-bold text-white">Esteira / Demandas</h2>
+              </div>
+              <div className="bg-gray-900/30 border border-white/5 rounded-3xl p-2 backdrop-blur-sm max-h-[400px] overflow-y-auto">
+                {queueTasks.map(task => {
+                  const cl = clienteById(task.clientId);
+                  return (
+                    <div key={task.id} className="group p-4 flex items-center justify-between hover:bg-white/5 rounded-2xl transition-colors border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${cl.theme}`}/>
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-200 group-hover:text-white">{task.title}</h4>
+                          <p className={`text-xs mt-1 ${cl.text}`}>{cl.name} · <span className="text-gray-500">{task.platform}</span></p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded-md border border-white/5">{task.status==='review'?'Aprovação':'Fila'}</span>
+                        <button onClick={()=>abrirEdicao(task)} className="opacity-0 group-hover:opacity-100 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded text-xs transition-all">
+                          <i className="fa-solid fa-play"/>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {queueTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma demanda na esteira.</p>}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* ═══ FINALIZADAS ═══ */}
+        <section className="pt-10 border-t border-white/5 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-check-double"/></div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Projetos & Demandas Finalizadas</h2>
+              <p className="text-sm text-gray-400">Histórico de entregas recentes.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {doneTasks.map(task => {
+              const cl = clienteById(task.clientId);
+              return (
+                <div key={task.id} className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 opacity-80 hover:opacity-100 transition-opacity">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0"><i className="fa-solid fa-check"/></div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white line-clamp-1">{task.title}</h4>
+                    <p className={`text-xs mt-0.5 font-semibold uppercase tracking-wider ${cl.text}`}>{cl.name}</p>
+                  </div>
+                </div>
+              );
+            })}
+            {doneTasks.length===0&&(
+              <div className="col-span-full py-10 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
+                <p className="text-gray-500">Nenhum projeto finalizado ainda.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ═══ CAMPANHAS NO AR ═══ */}
+        <section className="pt-10 border-t border-white/5 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-500/20 text-green-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-bolt"/></div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Campanhas no Ar</h2>
+                <p className="text-sm text-gray-400">Anúncios cadastrados manualmente para vitrine.</p>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md flex-wrap gap-1">
+                {clientes.map(cl=>(
+                  <button key={cl.id} onClick={()=>setActiveAdTab(cl.id)}
+                    className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${activeAdTab===cl.id?`${cl.bg} ${cl.text} shadow-md`:'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+                    {cl.name}
+                  </button>
+                ))}
+              </div>
+              <button onClick={()=>{ setNewAd({title:'',copy:'',clientId:activeAdTab,platform:'Meta',imageUrl:''}); setModal('anuncio'); }}
+                className="bg-green-600/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+                <i className="fa-solid fa-plus"/> Cadastrar Anúncio
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {anuncios.filter(ad=>ad.clientId===activeAdTab).map(ad=>{
+              const cl = clienteById(ad.clientId);
+              return (
+                <div key={ad.id} className="group flex flex-col bg-gray-900/40 border border-white/10 rounded-3xl overflow-hidden hover:border-white/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50">
+                  <div className="h-48 relative bg-black/50 flex items-center justify-center overflow-hidden">
+                    {ad.imageUrl?(<>
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent z-10"/>
+                      <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105"/>
+                    </>):(
+                      <div className="text-center z-10"><i className="fa-regular fa-image text-4xl text-gray-600 mb-2"/><span className="text-xs text-gray-500 uppercase tracking-wider font-bold block">Sem imagem</span></div>
+                    )}
+                    <div className="absolute top-4 left-4 z-20">
+                      <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[10px] uppercase font-black px-3 py-1.5 rounded-full flex items-center backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2 animate-pulse"/> Rodando
+                      </span>
+                    </div>
+                    <div className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-md p-2 rounded-xl border border-white/10 text-gray-300">
+                      {ad.platform==='Meta'?<i className="fa-brands fa-facebook text-blue-400"/>:<i className="fa-solid fa-magnifying-glass text-red-400"/>}
+                    </div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col z-10 bg-gray-900/60 backdrop-blur-xl">
+                    <h4 className="text-lg font-bold text-white mb-4 line-clamp-1">{ad.title}</h4>
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/5 flex-1 relative mb-4">
+                      <div className={`absolute top-0 left-4 w-8 h-1 bg-gradient-to-r ${cl.theme} rounded-b-full`}/>
+                      <p className="text-sm text-gray-400 leading-relaxed italic line-clamp-4">"{ad.copy}"</p>
+                    </div>
+                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{ad.platform}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {anuncios.filter(ad=>ad.clientId===activeAdTab).length===0&&(
+              <div className="col-span-full py-20 text-center border border-white/5 border-dashed rounded-3xl bg-white/[0.02]">
+                <p className="text-gray-500 text-lg">Nenhum anúncio cadastrado no momento.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+      </main>
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAIS
+      ═══════════════════════════════════════════════════════ */}
+
+      {/* ── MODAL: ADICIONAR CLIENTE ── */}
+      {modal==='cliente'&&(
+        <ModalWrap onClose={closeModal} borderColor="border-white/20" title="Adicionar Cliente" icon="fa-solid fa-user-plus" iconColor="text-white">
+          <form onSubmit={handleAddCliente} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Nome do Cliente *</label>
+              <input required type="text" placeholder="Ex: Empresa XYZ"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-white/30 placeholder-gray-600"
+                value={novoCliente.name} onChange={e=>setNovoCliente({...novoCliente,name:e.target.value})}/>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Cor do Cliente</label>
+              <div className="grid grid-cols-4 gap-3">
+                {PALETA.map(p=>(
+                  <button key={p.id} type="button"
+                    onClick={()=>setNovoCliente({...novoCliente,paletaId:p.id})}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${novoCliente.paletaId===p.id?'border-white/50 bg-white/10':'border-white/5 bg-white/[0.02] hover:bg-white/5'}`}>
+                    <div className="w-8 h-8 rounded-full shadow-lg" style={{background:p.dot}}/>
+                    <span className="text-[10px] text-gray-400 font-semibold">{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
+              <button type="submit" className="flex-1 bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                <i className="fa-solid fa-plus"/> Adicionar
+              </button>
+            </div>
+          </form>
+        </ModalWrap>
+      )}
+
+      {/* ── MODAL: NOVA DEMANDA ── */}
+      {modal==='novadem'&&(
+        <ModalWrap onClose={closeModal} borderColor="border-purple-500/30" title="Nova Demanda" icon="fa-solid fa-plus" iconColor="text-purple-400">
+          <form onSubmit={handleCriarDemanda} className="space-y-4">
+            <div>
+              <label className="lbl">Título da Demanda *</label>
+              <input required type="text" placeholder="Ex: Campanha Dia dos Namorados" className="inp focus:border-purple-500/50"
+                value={novaDemanda.title} onChange={e=>setNovaDemanda({...novaDemanda,title:e.target.value})}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Cliente *</label>
+                <select className="inp focus:border-purple-500/50" value={novaDemanda.clientId} onChange={e=>setNovaDemanda({...novaDemanda,clientId:e.target.value})}>
+                  {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Solicitante</label>
+                <input type="text" placeholder="Ex: Juan, Ana..." className="inp focus:border-purple-500/50"
+                  value={novaDemanda.solicitante} onChange={e=>setNovaDemanda({...novaDemanda,solicitante:e.target.value})}/>
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Responsável (Marketing)</label>
+              <input type="text" placeholder="Ex: Ana Silva, Marina..." className="inp focus:border-purple-500/50"
+                value={novaDemanda.responsavel} onChange={e=>setNovaDemanda({...novaDemanda,responsavel:e.target.value})}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Status Inicial</label>
+                <select className="inp focus:border-purple-500/50" value={novaDemanda.status} onChange={e=>setNovaDemanda({...novaDemanda,status:e.target.value})}>
+                  <option value="inbox">Inbox (Triagem)</option>
+                  <option value="todo">Fila de Produção</option>
+                  <option value="doing">Em Foco</option>
+                  <option value="review">Revisão</option>
+                  <option value="done">Finalizado</option>
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Prioridade</label>
+                <select className="inp focus:border-purple-500/50" value={novaDemanda.prioridade} onChange={e=>setNovaDemanda({...novaDemanda,prioridade:e.target.value})}>
+                  <option value="Normal">Normal</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Urgente">Urgente 🔴</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Plataforma</label>
+                <select className="inp focus:border-purple-500/50" value={novaDemanda.platform} onChange={e=>setNovaDemanda({...novaDemanda,platform:e.target.value})}>
+                  {['Meta Ads','Google Ads','TikTok Ads','YouTube','LinkedIn','Site/LP','Data Studio','Outros'].map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Prazo *</label>
+                <input required type="text" placeholder="15/05 ou Urgente" className="inp focus:border-purple-500/50"
+                  value={novaDemanda.deadline} onChange={e=>setNovaDemanda({...novaDemanda,deadline:e.target.value})}/>
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Data de Início</label>
+              <input type="date" className="inp focus:border-purple-500/50"
+                value={novaDemanda.startDate} onChange={e=>setNovaDemanda({...novaDemanda,startDate:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Progresso: <span className="text-purple-400">{novaDemanda.progress}%</span></label>
+              <input type="range" min="0" max="100" className="w-full"
+                value={novaDemanda.progress} onChange={e=>setNovaDemanda({...novaDemanda,progress:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Observações (Opcional)</label>
+              <textarea rows="3" placeholder="Notas, links, contexto..." className="inp focus:border-purple-500/50"
+                value={novaDemanda.notes} onChange={e=>setNovaDemanda({...novaDemanda,notes:e.target.value})}/>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
+              <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-plus mr-2"/>Criar Demanda
+              </button>
+            </div>
+          </form>
+        </ModalWrap>
+      )}
+
+      {/* ── MODAL: EDITAR TAREFA ── */}
+      {modal==='editTask'&&editingTask&&(
+        <ModalWrap onClose={closeModal} borderColor="border-blue-500/30" title="Editar Demanda" icon="fa-solid fa-pen-to-square" iconColor="text-blue-400">
+          <form onSubmit={salvarEdicao} className="space-y-4">
+            <div>
+              <label className="lbl">Título</label>
+              <input required type="text" className="inp focus:border-blue-500/50"
+                value={editingTask.title} onChange={e=>setEditingTask({...editingTask,title:e.target.value})}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Cliente</label>
+                <select className="inp focus:border-blue-500/50" value={editingTask.clientId||clientes[0]?.id} onChange={e=>setEditingTask({...editingTask,clientId:e.target.value})}>
+                  {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Solicitante</label>
+                <input type="text" placeholder="Ex: Juan" className="inp focus:border-blue-500/50"
+                  value={editingTask.solicitante||''} onChange={e=>setEditingTask({...editingTask,solicitante:e.target.value})}/>
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Responsável (Marketing)</label>
+              <input type="text" placeholder="Ex: Ana Silva, Marina" className="inp focus:border-blue-500/50"
+                value={editingTask.responsavel||''} onChange={e=>setEditingTask({...editingTask,responsavel:e.target.value})}/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Status</label>
+                <select className="inp focus:border-blue-500/50" value={editingTask.status} onChange={e=>setEditingTask({...editingTask,status:e.target.value})}>
+                  <option value="inbox">Inbox</option>
+                  <option value="todo">Fila (A Fazer)</option>
+                  <option value="doing">Em Foco</option>
+                  <option value="review">Em Aprovação</option>
+                  <option value="done">Finalizado</option>
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Prioridade</label>
+                <select className="inp focus:border-blue-500/50" value={editingTask.prioridade||'Normal'} onChange={e=>setEditingTask({...editingTask,prioridade:e.target.value})}>
+                  <option value="Normal">Normal</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Urgente">Urgente 🔴</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Plataforma</label>
+                <select className="inp focus:border-blue-500/50" value={editingTask.platform||'Meta Ads'} onChange={e=>setEditingTask({...editingTask,platform:e.target.value})}>
+                  {['Meta Ads','Google Ads','TikTok Ads','YouTube','LinkedIn','Site/LP','Data Studio','Outros'].map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Prazo Final</label>
+                <input type="text" placeholder="10/05 ou Hoje" className="inp focus:border-blue-500/50"
+                  value={editingTask.deadline||''} onChange={e=>setEditingTask({...editingTask,deadline:e.target.value})}/>
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Data de Início</label>
+              <input type="date" className="inp focus:border-blue-500/50"
+                value={editingTask.startDate||''} onChange={e=>setEditingTask({...editingTask,startDate:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Progresso: <span className="text-blue-400">{editingTask.progress||0}%</span></label>
+              <input type="range" min="0" max="100" className="w-full"
+                value={editingTask.progress||0} onChange={e=>setEditingTask({...editingTask,progress:parseInt(e.target.value)})}/>
+            </div>
+            <div>
+              <label className="lbl">Observações</label>
+              <textarea rows="3" placeholder="Notas, links, contexto..." className="inp focus:border-blue-500/50"
+                value={editingTask.notes||''} onChange={e=>setEditingTask({...editingTask,notes:e.target.value})}/>
+            </div>
+            <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
+              <button type="button" onClick={()=>{ delFromList(setTasks,'tasks',editingTask.id); setModal(null); }}
+                className="bg-red-600/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 p-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-trash"/>
+              </button>
+              <button type="button" onClick={()=>moverParaFinalizado(editingTask.id)}
+                className="flex-1 bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold py-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-check-double mr-2"/>Finalizar
+              </button>
+              <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-floppy-disk mr-2"/>Salvar
+              </button>
+            </div>
+          </form>
+        </ModalWrap>
+      )}
+
+      {/* ── MODAL: SOLICITAR CRIATIVO ── */}
+      {modal==='criativo'&&(
+        <ModalWrap onClose={closeModal} borderColor="border-fuchsia-500/30" title="Solicitar Criativo" icon="fa-solid fa-palette" iconColor="text-fuchsia-400">
+          <form onSubmit={handleAddCriativo} className="space-y-4">
+            <div>
+              <label className="lbl">Título do Criativo</label>
+              <input required type="text" className="inp focus:border-fuchsia-500/50"
+                value={newCreative.title} onChange={e=>setNewCreative({...newCreative,title:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Cliente</label>
+              <select className="inp focus:border-fuchsia-500/50" value={newCreative.clientId} onChange={e=>setNewCreative({...newCreative,clientId:e.target.value})}>
+                {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="lbl">Briefing / Conteúdo</label>
+              <textarea required rows="3" placeholder="Descreva o que precisa: formato, estilo, mensagem..." className="inp focus:border-fuchsia-500/50"
+                value={newCreative.content} onChange={e=>setNewCreative({...newCreative,content:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Link de Referência (Opcional)</label>
+              <input type="url" placeholder="https://drive.google.com/..." className="inp focus:border-fuchsia-500/50"
+                value={newCreative.link} onChange={e=>setNewCreative({...newCreative,link:e.target.value})}/>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
+              <button type="submit" className="flex-1 bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl transition-colors">Solicitar</button>
+            </div>
+          </form>
+        </ModalWrap>
+      )}
+
+      {/* ── MODAL: CADASTRAR ANÚNCIO ── */}
+      {modal==='anuncio'&&(
+        <ModalWrap onClose={closeModal} borderColor="border-green-500/30" title="Cadastrar Anúncio Ativo" icon="fa-solid fa-bolt" iconColor="text-green-400">
+          <form onSubmit={handleAddAnuncio} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="lbl">Cliente</label>
+                <select className="inp focus:border-green-500/50" value={newAd.clientId} onChange={e=>setNewAd({...newAd,clientId:e.target.value})}>
+                  {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lbl">Plataforma</label>
+                <select className="inp focus:border-green-500/50" value={newAd.platform} onChange={e=>setNewAd({...newAd,platform:e.target.value})}>
+                  <option value="Meta">Meta Ads</option>
+                  <option value="Google">Google Ads</option>
+                  <option value="TikTok">TikTok Ads</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="lbl">Nome do Anúncio</label>
+              <input required type="text" placeholder="Ex: Carrossel Dia das Mães" className="inp focus:border-green-500/50"
+                value={newAd.title} onChange={e=>setNewAd({...newAd,title:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Copy (Texto do Anúncio)</label>
+              <textarea required rows="3" className="inp focus:border-green-500/50"
+                value={newAd.copy} onChange={e=>setNewAd({...newAd,copy:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Link da Imagem (Opcional)</label>
+              <input type="url" placeholder="https://..." className="inp focus:border-green-500/50"
+                value={newAd.imageUrl} onChange={e=>setNewAd({...newAd,imageUrl:e.target.value})}/>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
+              <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition-colors">Publicar no Painel</button>
+            </div>
+          </form>
+        </ModalWrap>
+      )}
+
+      {/* ── MODAL: COMENTÁRIOS ── */}
+      {modal==='coms'&&comentarioTaskId&&(()=>{
+        const taskCom = tasks.find(t=>String(t.id)===comentarioTaskId);
+        const cl = taskCom ? clienteById(taskCom.clientId) : clientes[0];
+        const listaComs = getComs(comentarioTaskId);
+        return (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={closeModal}>
+            <div className="bg-[#0d1220] border border-purple-500/30 rounded-t-3xl md:rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] slide-up" onClick={e=>e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5">
+                <div className="flex items-center gap-3">
+                  {taskCom&&<span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>}
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-comments text-purple-400"/> Comentários</h2>
+                    {taskCom&&<p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{taskCom.title}</p>}
+                  </div>
+                </div>
+                <button onClick={closeModal} className="text-gray-500 hover:text-white transition-colors">
+                  <i className="fa-solid fa-xmark text-xl"/>
+                </button>
+              </div>
+
+              {/* Seletor de usuário */}
+              <div className="px-6 pt-4 pb-2 border-b border-white/5">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Quem é você?</label>
+                <input type="text" placeholder="Seu nome (ex: Juan, Ana...)"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500/40 placeholder-gray-600"
+                  value={nomeUsuario}
+                  onChange={e=>{ setNomeUsuario(e.target.value); save('nomeUsuario',e.target.value); }}/>
+              </div>
+
+              {/* Lista */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {listaComs.length===0&&(
+                  <div className="text-center py-10">
+                    <i className="fa-regular fa-comment-dots text-4xl text-gray-700 mb-3 block"/>
+                    <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
+                    <p className="text-gray-600 text-xs mt-1">Seja o primeiro a comentar!</p>
+                  </div>
+                )}
+                {listaComs.map(com=>(
+                  <div key={com.id} className="flex gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-purple-400 text-xs font-black">{(com.autor||'?')[0].toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-purple-300">{com.autor}</span>
+                        <span className="text-[10px] text-gray-600">{com.data}</span>
+                      </div>
+                      <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3">
+                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{com.texto}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input */}
+              <div className="p-4 border-t border-white/5">
+                <form onSubmit={adicionarCom} className="flex gap-3">
+                  <textarea rows="1" placeholder="Escreva um comentário... (Enter para enviar)"
+                    className="flex-1 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-purple-500/50 placeholder-gray-600 resize-none"
+                    value={novoComentario}
+                    onChange={e=>setNovoComentario(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ adicionarCom(e); } }}/>
+                  <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white px-4 rounded-2xl font-bold transition-colors flex items-center justify-center">
+                    <i className="fa-solid fa-paper-plane"/>
+                  </button>
+                </form>
+                <p className="text-[10px] text-gray-600 mt-1.5 text-center">Enter para enviar · Shift+Enter para nova linha</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+    </div>
+  );
+}
+
+// ── COMPONENTE MODAL WRAPPER ──────────────────────────────────
+function ModalWrap({ onClose, borderColor, title, icon, iconColor, children }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className={`bg-[#0f1523] border ${borderColor} rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[92vh] overflow-y-auto`} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+          <i className="fa-solid fa-xmark text-xl"/>
+        </button>
+        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i className={`${icon} ${iconColor}`}/> {title}
+        </h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── CSS HELPERS (via Tailwind JIT trick) ──────────────────────
+const style = document.createElement('style');
+style.textContent = `
+  .lbl { display:block; font-size:0.65rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem; }
+  .inp { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); border-radius:0.75rem; padding:0.75rem 1rem; color:white; outline:none; transition:border-color 0.2s; resize:vertical; }
+  .inp::placeholder { color:#4b5563; }
+`;
+document.head.appendChild(style);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
