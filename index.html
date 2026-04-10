@@ -77,6 +77,7 @@
           const [tasks, setTasks]       = useState(() => loadLocal('tasks',     TAREFAS_MOCK));
           const [anuncios, setAnuncios] = useState(() => loadLocal('anuncios',  ANUNCIOS_MOCK));
           const [criativos, setCriativos] = useState(() => loadLocal('criativos', CRIATIVOS_MOCK));
+          const [comentarios, setComentarios] = useState(() => loadLocal('comentarios', {}));
 
           // Modais
           const [isAdModalOpen,        setIsAdModalOpen]        = useState(false);
@@ -84,10 +85,28 @@
           const [isEditTaskModalOpen,  setIsEditTaskModalOpen]  = useState(false);
           const [isNovaDemandaOpen,    setIsNovaDemandaOpen]    = useState(false);
           const [editingTask,          setEditingTask]          = useState(null);
+          const [comentarioTaskId,     setComentarioTaskId]     = useState(null);
+          const [novoComentario,       setNovoComentario]       = useState('');
 
           const [newAd,       setNewAd]       = useState({ title: '', copy: '', client: 'moteis', platform: 'Meta', imageUrl: '' });
           const [newCreative, setNewCreative] = useState({ title: 'CRIATIVO NOVO: ', content: '', client: 'moteis', link: '' });
           const [novaDemanda, setNovaDemanda] = useState({ ...NOVA_DEMANDA_VAZIA });
+
+          // Helpers comentários
+          const getComentariosDaTarefa = (taskId) => comentarios[String(taskId)] || [];
+          const abrirComentarios = (taskId) => { setComentarioTaskId(String(taskId)); setNovoComentario(''); };
+          const fecharComentarios = () => setComentarioTaskId(null);
+          const adicionarComentario = (e) => {
+            e.preventDefault();
+            if (!novoComentario.trim()) return;
+            const novo = { id: Date.now().toString(), texto: novoComentario.trim(), autor: 'Você', data: new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) };
+            setComentarios(curr => {
+              const updated = { ...curr, [comentarioTaskId]: [...(curr[comentarioTaskId] || []), novo] };
+              saveLocal('comentarios', updated);
+              return updated;
+            });
+            setNovoComentario('');
+          };
 
           // --- SYNC ---
           const syncData = (colName, item) => {
@@ -369,16 +388,28 @@
                                   onChange={(e) => atualizarNotaTarefa(task.id, e.target.value)}
                                   onBlur={() => salvarNotaFinal(task)}
                                 />
+                                {/* Botões: Comentários + Finalizar */}
+                                <div className="flex gap-3 mt-4">
+                                  <button
+                                    onClick={() => abrirComentarios(task.id)}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-purple-600/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 hover:border-purple-500/40 py-2.5 rounded-xl text-xs font-bold transition-all relative"
+                                  >
+                                    <i className="fa-solid fa-comments"></i> Comentários
+                                    {getComentariosDaTarefa(task.id).length > 0 && (
+                                      <span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">
+                                        {getComentariosDaTarefa(task.id).length}
+                                      </span>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => moverParaFinalizado(task.id)}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 py-2.5 rounded-xl text-xs font-bold transition-all"
+                                  >
+                                    <i className="fa-solid fa-check-double"></i> Finalizar
+                                  </button>
+                                </div>
                               </div>
                             </div>
-
-                            {/* Ação rápida: Finalizar */}
-                            <button
-                              onClick={() => moverParaFinalizado(task.id)}
-                              className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 py-2.5 rounded-xl text-xs font-bold transition-all"
-                            >
-                              <i className="fa-solid fa-check-double"></i> Finalizar Demanda
-                            </button>
                           </div>
                         </div>
                       ))}
@@ -589,6 +620,81 @@
                 </section>
 
               </main>
+
+              {/* ===== MODAL: COMENTÁRIOS ===== */}
+              {comentarioTaskId && (() => {
+                const taskComentada = tasks.find(t => String(t.id) === comentarioTaskId);
+                const listaComs = getComentariosDaTarefa(comentarioTaskId);
+                return (
+                  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={fecharComentarios}>
+                    <div
+                      className="bg-[#0d1220] border border-purple-500/30 rounded-t-3xl md:rounded-3xl w-full max-w-lg shadow-2xl relative flex flex-col max-h-[85vh]"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Header do modal */}
+                      <div className="flex items-center justify-between p-6 border-b border-white/5">
+                        <div>
+                          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                            <i className="fa-solid fa-comments text-purple-400"></i> Comentários
+                          </h2>
+                          {taskComentada && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{taskComentada.title}</p>}
+                        </div>
+                        <button onClick={fecharComentarios} className="text-gray-500 hover:text-white transition-colors">
+                          <i className="fa-solid fa-xmark text-xl"></i>
+                        </button>
+                      </div>
+
+                      {/* Lista de comentários */}
+                      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        {listaComs.length === 0 && (
+                          <div className="text-center py-10">
+                            <i className="fa-regular fa-comment-dots text-4xl text-gray-700 mb-3 block"></i>
+                            <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
+                            <p className="text-gray-600 text-xs mt-1">Seja o primeiro a comentar!</p>
+                          </div>
+                        )}
+                        {listaComs.map(com => (
+                          <div key={com.id} className="flex gap-3">
+                            <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <i className="fa-solid fa-user text-purple-400 text-xs"></i>
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-bold text-purple-300">{com.autor}</span>
+                                <span className="text-[10px] text-gray-600">{com.data}</span>
+                              </div>
+                              <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3">
+                                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{com.texto}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Input novo comentário */}
+                      <div className="p-4 border-t border-white/5">
+                        <form onSubmit={adicionarComentario} className="flex gap-3">
+                          <textarea
+                            rows="1"
+                            placeholder="Escreva um comentário..."
+                            className="flex-1 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-purple-500/50 placeholder-gray-600 resize-none"
+                            value={novoComentario}
+                            onChange={e => setNovoComentario(e.target.value)}
+                            onKeyDown={e => { if(e.key === 'Enter' && !e.shiftKey) adicionarComentario(e); }}
+                          />
+                          <button
+                            type="submit"
+                            className="bg-purple-600 hover:bg-purple-500 text-white px-4 rounded-2xl font-bold transition-colors flex items-center justify-center"
+                          >
+                            <i className="fa-solid fa-paper-plane"></i>
+                          </button>
+                        </form>
+                        <p className="text-[10px] text-gray-600 mt-2 text-center">Enter para enviar · Shift+Enter para nova linha</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ======================================= */}
               {/* MODAL: NOVA DEMANDA (COMPLETO)          */}
