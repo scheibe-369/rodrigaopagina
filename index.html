@@ -10,35 +10,18 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      * { box-sizing: border-box; }
       input[type=range] { accent-color: #a855f7; }
-      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar { width: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
-
-      @keyframes slideUp { from { transform:translateY(60px); opacity:0; } to { transform:translateY(0); opacity:1; } }
-      .slide-up { animation: slideUp 0.25s cubic-bezier(.22,.61,.36,1); }
-
-      @keyframes fadeIn { from { opacity:0; transform:scale(0.97); } to { opacity:1; transform:scale(1); } }
-      .fade-in { animation: fadeIn 0.18s ease; }
-
-      /* Kanban */
-      .kanban-wrap { display:flex; gap:16px; overflow-x:auto; padding-bottom:16px; min-height:520px; }
-      .kanban-col { flex:0 0 280px; display:flex; flex-direction:column; min-height:400px; }
-      .kanban-col-body { flex:1; overflow-y:auto; min-height:120px; border-radius:16px; padding:8px; transition: background 0.2s, border-color 0.2s; }
-      .kanban-col-body.drag-over { background: rgba(168,85,247,0.08) !important; border-color: rgba(168,85,247,0.4) !important; }
-
-      .task-card { cursor:grab; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s; user-select:none; }
-      .task-card:active { cursor:grabbing; }
-      .task-card.dragging { opacity:0.35; transform:scale(0.97); }
-      .task-card.drag-ghost { transform:rotate(-1.5deg) scale(1.03); box-shadow:0 20px 60px rgba(0,0,0,0.6); }
-
-      .kanban-wrap::-webkit-scrollbar { height: 6px; }
-      .kanban-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
-
-      .lbl { display:block; font-size:0.65rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem; }
-      .inp { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); border-radius:0.75rem; padding:0.75rem 1rem; color:white; outline:none; transition:border-color 0.2s; resize:vertical; }
-      .inp::placeholder { color:#4b5563; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+      @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .slide-up { animation: slideUp 0.25s ease-out; }
+      /* Drag-to-reorder */
+      .drag-card { cursor: grab; transition: opacity 0.15s, transform 0.15s; }
+      .drag-card:active { cursor: grabbing; }
+      .drag-card.is-dragging { opacity: 0.3; transform: scale(0.98); }
+      .drag-card.drag-over-top { border-top: 2px solid rgba(168,85,247,0.7) !important; margin-top: -2px; }
+      .drag-card.drag-over-bottom { border-bottom: 2px solid rgba(168,85,247,0.7) !important; }
     </style>
 </head>
 <body>
@@ -46,483 +29,618 @@
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
-// ── PALETA ─────────────────────────────────────────────────────
+// ── PALETA DE CORES DOS CLIENTES ──────────────────────────────
 const PALETA = [
-  { id:'rosa',     label:'Rosa',     dot:'#f43f5e', theme:'from-rose-500 to-pink-600',      text:'text-pink-400',    bg:'bg-pink-500/10',    border:'border-pink-500/30' },
-  { id:'ciano',    label:'Ciano',    dot:'#06b6d4', theme:'from-cyan-500 to-blue-600',      text:'text-cyan-400',    bg:'bg-cyan-500/10',    border:'border-cyan-500/30' },
-  { id:'fucsia',   label:'Fúcsia',   dot:'#a855f7', theme:'from-purple-500 to-fuchsia-600', text:'text-fuchsia-400', bg:'bg-fuchsia-500/10', border:'border-fuchsia-500/30' },
-  { id:'laranja',  label:'Laranja',  dot:'#f97316', theme:'from-orange-500 to-amber-600',   text:'text-orange-400',  bg:'bg-orange-500/10',  border:'border-orange-500/30' },
-  { id:'verde',    label:'Verde',    dot:'#22c55e', theme:'from-green-500 to-emerald-600',  text:'text-green-400',   bg:'bg-green-500/10',   border:'border-green-500/30' },
-  { id:'amarelo',  label:'Amarelo',  dot:'#eab308', theme:'from-yellow-500 to-amber-500',   text:'text-yellow-400',  bg:'bg-yellow-500/10',  border:'border-yellow-500/30' },
-  { id:'indigo',   label:'Índigo',   dot:'#6366f1', theme:'from-indigo-500 to-violet-600',  text:'text-indigo-400',  bg:'bg-indigo-500/10',  border:'border-indigo-500/30' },
-  { id:'vermelho', label:'Vermelho', dot:'#ef4444', theme:'from-red-500 to-rose-700',       text:'text-red-400',     bg:'bg-red-500/10',     border:'border-red-500/30' },
+  { id: 'rosa',     label: 'Rosa',     dot: '#f43f5e', theme: 'from-rose-500 to-pink-600',    text: 'text-pink-400',    bg: 'bg-pink-500/10',    border: 'border-pink-500/30' },
+  { id: 'ciano',    label: 'Ciano',    dot: '#06b6d4', theme: 'from-cyan-500 to-blue-600',    text: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/30' },
+  { id: 'fucsia',   label: 'Fúcsia',   dot: '#a855f7', theme: 'from-purple-500 to-fuchsia-600', text: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/30' },
+  { id: 'laranja',  label: 'Laranja',  dot: '#f97316', theme: 'from-orange-500 to-amber-600',  text: 'text-orange-400',  bg: 'bg-orange-500/10',  border: 'border-orange-500/30' },
+  { id: 'verde',    label: 'Verde',    dot: '#22c55e', theme: 'from-green-500 to-emerald-600', text: 'text-green-400',   bg: 'bg-green-500/10',   border: 'border-green-500/30' },
+  { id: 'amarelo',  label: 'Amarelo',  dot: '#eab308', theme: 'from-yellow-500 to-amber-500',  text: 'text-yellow-400',  bg: 'bg-yellow-500/10',  border: 'border-yellow-500/30' },
+  { id: 'indigo',   label: 'Índigo',   dot: '#6366f1', theme: 'from-indigo-500 to-violet-600', text: 'text-indigo-400',  bg: 'bg-indigo-500/10',  border: 'border-indigo-500/30' },
+  { id: 'vermelho', label: 'Vermelho', dot: '#ef4444', theme: 'from-red-500 to-rose-700',      text: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/30' },
 ];
 
-// ── COLUNAS DO KANBAN ───────────────────────────────────────────
-const COLUNAS = [
-  { id:'inbox',  label:'Inbox',     icon:'fa-inbox',       color:'text-yellow-400',  bg:'bg-yellow-500/10',  border:'border-yellow-500/25', headerBg:'bg-yellow-500/10' },
-  { id:'todo',   label:'Fila',      icon:'fa-list-check',  color:'text-blue-400',    bg:'bg-blue-500/10',    border:'border-blue-500/25',   headerBg:'bg-blue-500/10' },
-  { id:'doing',  label:'Em Foco',   icon:'fa-fire',        color:'text-orange-400',  bg:'bg-orange-500/10',  border:'border-orange-500/25', headerBg:'bg-orange-500/10' },
-  { id:'review', label:'Revisão',   icon:'fa-eye',         color:'text-purple-400',  bg:'bg-purple-500/10',  border:'border-purple-500/25', headerBg:'bg-purple-500/10' },
-  { id:'done',   label:'Finalizado',icon:'fa-check-double',color:'text-emerald-400', bg:'bg-emerald-500/10', border:'border-emerald-500/25',headerBg:'bg-emerald-500/10' },
-];
-
-// ── DADOS MOCK ──────────────────────────────────────────────────
+// ── CLIENTES INICIAIS ─────────────────────────────────────────
 const CLIENTES_INICIAIS = [
-  { id:'moteis', name:'Motéis',    paletaId:'rosa',   ...PALETA.find(p=>p.id==='rosa')   },
-  { id:'cubo',   name:'Cubo Self', paletaId:'ciano',  ...PALETA.find(p=>p.id==='ciano')  },
-  { id:'viv',    name:'ViV',       paletaId:'fucsia', ...PALETA.find(p=>p.id==='fucsia') },
+  { id: 'moteis', name: 'Motéis',   paletaId: 'rosa',  ...PALETA.find(p=>p.id==='rosa') },
+  { id: 'cubo',   name: 'Cubo Self',paletaId: 'ciano', ...PALETA.find(p=>p.id==='ciano') },
+  { id: 'viv',    name: 'ViV',      paletaId: 'fucsia',...PALETA.find(p=>p.id==='fucsia') },
 ];
 
 const TAREFAS_MOCK = [
-  { id:'1', title:'Campanha Dia dos Namorados',         clientId:'moteis', solicitante:'Juan',   responsavel:'', startDate:'2026-04-05', deadline:'10/05', status:'doing',  progress:75, platform:'Meta Ads',   prioridade:'Normal', notes:'Focar na nova suíte presidencial.\nPedir fotos oficiais até quarta.' },
-  { id:'6', title:'Ajustar Lances de Leilão de Busca',  clientId:'cubo',   solicitante:'Carlos', responsavel:'', startDate:'2026-04-08', deadline:'Hoje',  status:'doing',  progress:40, platform:'Google Ads', prioridade:'Alta',   notes:'' },
-  { id:'2', title:'Otimização de Palavras-chave',        clientId:'cubo',   solicitante:'',       responsavel:'', deadline:'12/04',       status:'review', platform:'Google Ads', prioridade:'Normal' },
-  { id:'3', title:'Estruturar Landing Page Nova Coleção',clientId:'viv',    solicitante:'',       responsavel:'', deadline:'20/04',       status:'todo',   platform:'Web',        prioridade:'Normal' },
-  { id:'7', title:'Promoção Relâmpago de Feriado',       clientId:'moteis', solicitante:'Juan',   responsavel:'', deadline:'Urgente',     status:'inbox',  platform:'Meta Ads',   prioridade:'Urgente' },
-  { id:'9', title:'Análise de Concorrência Q2',          clientId:'viv',    solicitante:'',       responsavel:'', deadline:'30/04',       status:'todo',   platform:'Data Studio', prioridade:'Normal' },
-  { id:'8', title:'Relatório Mensal de Março',           clientId:'viv',    solicitante:'',       responsavel:'', startDate:'2026-04-01', deadline:'05/04',status:'done',   progress:100, platform:'Data Studio', prioridade:'Normal' },
+  { id:'1',  title:'Campanha Dia dos Namorados',        clientId:'moteis', solicitante:'Juan',   responsavel:'', startDate:'2026-04-05', deadline:'10/05', status:'doing',  progress:75, platform:'Meta Ads',    prioridade:'Normal', notes:'Focar na nova suíte presidencial.\nPedir as fotos oficiais para o Juan até quarta-feira.' },
+  { id:'6',  title:'Ajustar Lances de Leilão de Busca', clientId:'cubo',   solicitante:'Carlos', responsavel:'', startDate:'2026-04-08', deadline:'Hoje',  status:'doing',  progress:40, platform:'Google Ads',  prioridade:'Alta',   notes:'' },
+  { id:'2',  title:'Otimização de Palavras-chave',       clientId:'cubo',   solicitante:'',       responsavel:'', deadline:'12/04',       status:'review', platform:'Google Ads',  prioridade:'Normal' },
+  { id:'3',  title:'Estruturar Landing Page Nova Coleção',clientId:'viv',   solicitante:'',       responsavel:'', deadline:'20/04',       status:'todo',   platform:'Web',         prioridade:'Normal' },
+  { id:'7',  title:'Promoção Relâmpago de Feriado',      clientId:'moteis', solicitante:'Juan',   responsavel:'', deadline:'Urgente',     status:'inbox',  platform:'Meta Ads',    prioridade:'Urgente' },
+  { id:'8',  title:'Relatório Mensal de Março',          clientId:'viv',    solicitante:'',       responsavel:'', startDate:'2026-04-01', deadline:'05/04',status:'done',   progress:100, platform:'Data Studio', prioridade:'Normal' },
 ];
 
 const CRIATIVOS_MOCK = [
-  { id:'1', title:'CRIATIVO NOVO: Carrossel Dia das Mães', clientId:'viv', content:'3 imagens estilo minimalista nova coleção. Focar nas cores pastéis.', link:'https://drive.google.com/exemplo', status:'pendente' }
+  { id:'1', title:'CRIATIVO NOVO: Carrossel Dia das Mães', clientId:'viv', content:'Precisamos de 3 imagens no estilo minimalista mostrando a nova coleção. Focar nas cores pastéis.', link:'https://drive.google.com/exemplo-referencia', status:'pendente' }
 ];
+
 const ANUNCIOS_MOCK = [
-  { id:'101', clientId:'moteis', platform:'Meta',   title:'Carrossel Suítes Premium',     copy:'Surpreenda quem você ama neste final de semana. Suítes premium com hidro e teto solar.', imageUrl:'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=400&h=300' },
-  { id:'202', clientId:'cubo',   platform:'Meta',   title:'Vídeo Institucional - Segurança',copy:'Seus bens guardados com a mesma segurança de um banco. 🔒', imageUrl:'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=400&h=300' },
+  { id:'101', clientId:'moteis', platform:'Meta', title:'Carrossel Suítes Premium', copy:'Surpreenda quem você ama neste final de semana. Conheça novas suítes premium com hidro e teto solar.', imageUrl:'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=400&h=300' },
+  { id:'202', clientId:'cubo',   platform:'Meta', title:'Vídeo Institucional - Segurança', copy:'Seus bens guardados com a mesma segurança de um banco. 🔒 Assista ao vídeo.', imageUrl:'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=400&h=300' },
 ];
 
-// ── LOCALSTORAGE ────────────────────────────────────────────────
-const load = (k, fb) => { try { const v = localStorage.getItem('ts4_'+k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
-const save = (k, v)  => { try { localStorage.setItem('ts4_'+k, JSON.stringify(v)); } catch {} };
+// ── LOCALSTORAGE ──────────────────────────────────────────────
+const load = (key, fb) => { try { const v = localStorage.getItem('ts3_'+key); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+const save = (key, v) => { try { localStorage.setItem('ts3_'+key, JSON.stringify(v)); } catch {} };
 
-const NOVA_DEM_VAZIA   = { title:'', clientId:'', solicitante:'', responsavel:'', status:'inbox', prioridade:'Normal', platform:'Meta Ads', deadline:'', startDate:'', progress:0, notes:'' };
-const NOVO_CLI_VAZIO   = { name:'', paletaId:'rosa' };
+// ── ESTADO INICIAL NOVO CLIENTE ───────────────────────────────
+const NOVO_CLIENTE_VAZIO = { name:'', paletaId:'rosa' };
+const NOVA_DEMANDA_VAZIA = { title:'', clientId:'', solicitante:'', responsavel:'', status:'inbox', prioridade:'Normal', platform:'Meta Ads', deadline:'', startDate:'', progress:0, notes:'' };
 
-// ── APP ─────────────────────────────────────────────────────────
+// ── APP PRINCIPAL ─────────────────────────────────────────────
 function App() {
-  const [clientes,    setClientes]    = useState(()=>load('clientes',   CLIENTES_INICIAIS));
-  const [tasks,       setTasks]       = useState(()=>load('tasks',      TAREFAS_MOCK));
-  const [anuncios,    setAnuncios]    = useState(()=>load('anuncios',   ANUNCIOS_MOCK));
-  const [criativos,   setCriativos]  = useState(()=>load('criativos',  CRIATIVOS_MOCK));
-  const [comentarios, setComentarios]= useState(()=>load('comentarios', {}));
-  const [activeAdTab, setActiveAdTab]= useState('');
-  const [nomeUsuario, setNomeUsuario]= useState(()=>load('nomeUsuario',''));
+  const [clientes,   setClientes]   = useState(() => load('clientes', CLIENTES_INICIAIS));
+  const [tasks,      setTasks]      = useState(() => load('tasks',    TAREFAS_MOCK));
+  const [anuncios,   setAnuncios]   = useState(() => load('anuncios', ANUNCIOS_MOCK));
+  const [criativos,  setCriativos]  = useState(() => load('criativos',CRIATIVOS_MOCK));
+  const [comentarios,setComentarios]= useState(() => load('comentarios', {}));
+  const [activeAdTab,setActiveAdTab]= useState('');
 
-  // Drag & Drop
-  const [draggingId,  setDraggingId] = useState(null);
-  const [dragOverCol, setDragOverCol]= useState(null);
+  // Drag & Drop (reordenar esteira)
+  const dragItemId  = useRef(null);
+  const dragOverId  = useRef(null);
+  const [dragState, setDragState] = useState({ draggingId: null, overId: null, overPos: null }); // overPos: 'top'|'bottom'
 
   // Modais
-  const [modal,        setModal]       = useState(null);
-  const [editingTask,  setEditingTask] = useState(null);
-  const [comTaskId,    setComTaskId]   = useState(null);
-  const [novoComment,  setNovoComment] = useState('');
+  const [modal, setModal] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [comentarioTaskId, setComentarioTaskId] = useState(null);
+  const [nomeUsuario, setNomeUsuario] = useState(() => load('nomeUsuario',''));
+  const [novoComentario, setNovoComentario] = useState('');
 
   // Forms
-  const [novoCliente,  setNovoCliente] = useState({...NOVO_CLI_VAZIO});
-  const [novaDemanda,  setNovaDemanda] = useState({...NOVA_DEM_VAZIA});
-  const [newCreative,  setNewCreative] = useState({title:'CRIATIVO NOVO: ',content:'',clientId:'',link:''});
-  const [newAd,        setNewAd]       = useState({title:'',copy:'',clientId:'',platform:'Meta',imageUrl:''});
+  const [novoCliente, setNovoCliente] = useState({...NOVO_CLIENTE_VAZIO});
+  const [novaDemanda, setNovaDemanda] = useState({...NOVA_DEMANDA_VAZIA});
+  const [newCreative, setNewCreative] = useState({ title:'CRIATIVO NOVO: ', content:'', clientId:'', link:'' });
+  const [newAd,       setNewAd]       = useState({ title:'', copy:'', clientId:'', platform:'Meta', imageUrl:'' });
 
-  useEffect(()=>{ if(!activeAdTab&&clientes.length) setActiveAdTab(clientes[0].id); },[clientes]);
+  // Init activeAdTab
+  useEffect(() => { if (!activeAdTab && clientes.length) setActiveAdTab(clientes[0].id); }, [clientes]);
 
   // ── HELPERS ──
-  const cById = id => clientes.find(c=>c.id===id) || { id:'?',name:'?',theme:'from-gray-500 to-gray-700',text:'text-gray-400',bg:'bg-gray-500/10',border:'border-gray-500/30' };
-  const paleta = id => PALETA.find(p=>p.id===id)||PALETA[0];
-  const getComs = tid => comentarios[String(tid)]||[];
+  const clienteById = id => clientes.find(c=>c.id===id) || clientes[0] || { id:'?', name:'?', theme:'from-gray-500 to-gray-700', text:'text-gray-400', bg:'bg-gray-500/10', border:'border-gray-500/30' };
+  const paleta = id => PALETA.find(p=>p.id===id) || PALETA[0];
 
-  const prioColor = p => {
+  const prioridadeCor = p => {
     if (p==='Urgente') return 'text-red-400 bg-red-500/10 border-red-500/30';
     if (p==='Alta')    return 'text-orange-400 bg-orange-500/10 border-orange-500/30';
-    return null;
+    return 'text-gray-400 bg-white/5 border-white/10';
   };
 
   // ── SYNC ──
-  const syncList  = (setter,key,item) => setter(curr=>{
-    const i=curr.findIndex(x=>String(x.id)===String(item.id));
-    const ns=i>-1?Object.assign([],curr,{[i]:item}):[item,...curr];
+  const syncList = (setter, key, item) => setter(curr => {
+    const i = curr.findIndex(x=>String(x.id)===String(item.id));
+    const ns = i>-1 ? Object.assign([],curr,{[i]:item}) : [item,...curr];
     save(key,ns); return ns;
   });
-  const delItem   = (setter,key,id) => setter(curr=>{ const ns=curr.filter(x=>String(x.id)!==String(id)); save(key,ns); return ns; });
-  const syncTask  = t => syncList(setTasks,'tasks',t);
+  const delFromList = (setter, key, id) => setter(curr => { const ns=curr.filter(x=>String(x.id)!==String(id)); save(key,ns); return ns; });
 
-  // ── DRAG & DROP ──
-  const onDragStart = (e, taskId) => {
-    setDraggingId(taskId);
+  const syncTask     = t  => syncList(setTasks,    'tasks',    t);
+  const syncAnuncio  = a  => syncList(setAnuncios, 'anuncios', a);
+  const syncCriativo = c  => syncList(setCriativos,'criativos',c);
+
+  // ── TAREFAS ──
+  const aprovarParaFila = (id) => { const t=tasks.find(t=>String(t.id)===String(id)); if(t) syncTask({...t,status:'todo'}); };
+  const moverParaFinalizado = (id) => {
+    const t=tasks.find(t=>String(t.id)===String(id))||editingTask;
+    if(t) syncTask({...t,status:'done',progress:100});
+    if(modal==='editTask') setModal(null);
+  };
+  const atualizarNota = (id,nota) => setTasks(curr=>curr.map(t=>String(t.id)===String(id)?{...t,notes:nota}:t));
+  const salvarNota = task => syncTask(task);
+
+  // ── DRAG TO REORDER (esteira) ──
+  const handleDragStart = (e, taskId) => {
+    dragItemId.current = taskId;
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', taskId);
+    setDragState(s=>({...s, draggingId: taskId}));
   };
-  const onDragEnd   = () => { setDraggingId(null); setDragOverCol(null); };
-  const onDragOver  = (e, colId) => { e.preventDefault(); setDragOverCol(colId); };
-  const onDragLeave = () => setDragOverCol(null);
-  const onDrop      = (e, colId) => {
+  const handleDragOver = (e, taskId, el) => {
     e.preventDefault();
-    const tid = e.dataTransfer.getData('text/plain') || draggingId;
-    if (tid) {
-      const t = tasks.find(t=>String(t.id)===String(tid));
-      if (t && t.status !== colId) {
-        const updated = { ...t, status: colId };
-        if (colId==='done') updated.progress = 100;
-        if (colId==='doing' && !t.startDate) updated.startDate = new Date().toISOString().split('T')[0];
-        syncTask(updated);
-      }
-    }
-    setDraggingId(null);
-    setDragOverCol(null);
+    if (!dragItemId.current || dragItemId.current === taskId) return;
+    const rect = el.getBoundingClientRect();
+    const pos  = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom';
+    dragOverId.current = taskId;
+    setDragState(s=>({...s, overId: taskId, overPos: pos}));
   };
+  const handleDragEnd = () => {
+    const fromId = dragItemId.current;
+    const toId   = dragOverId.current;
+    const pos    = dragState.overPos;
+    if (fromId && toId && fromId !== toId) {
+      setTasks(curr => {
+        const doingList  = curr.filter(t=>t.status==='doing');
+        const otherTasks = curr.filter(t=>t.status!=='doing');
+        const fromIdx = doingList.findIndex(t=>String(t.id)===String(fromId));
+        const toIdx   = doingList.findIndex(t=>String(t.id)===String(toId));
+        if (fromIdx === -1 || toIdx === -1) return curr;
+        const reordered = [...doingList];
+        const [moved]   = reordered.splice(fromIdx, 1);
+        const insertAt  = pos === 'top' ? toIdx : toIdx + 1;
+        const adjusted  = insertAt > fromIdx ? insertAt - 1 : insertAt;
+        reordered.splice(adjusted, 0, moved);
+        const ns = [...reordered, ...otherTasks];
+        save('tasks', ns);
+        return ns;
+      });
+    }
+    dragItemId.current  = null;
+    dragOverId.current  = null;
+    setDragState({ draggingId: null, overId: null, overPos: null });
+  };
+
+  const doingTasks = tasks.filter(t=>t.status==='doing');
+  const queueTasks = tasks.filter(t=>t.status!=='doing'&&t.status!=='inbox'&&t.status!=='done');
+  const inboxTasks = tasks.filter(t=>t.status==='inbox');
+  const doneTasks  = tasks.filter(t=>t.status==='done');
+
+  const getTempoDecorrido = d => {
+    if (!d) return '0 dias';
+    const diff = Math.ceil(Math.abs(new Date()-new Date(d))/86400000);
+    return diff===1?'1 dia':`${diff} dias`;
+  };
+
+  const atualizarNota = (id,nota) => setTasks(curr=>curr.map(t=>String(t.id)===String(id)?{...t,notes:nota}:t));
+  const salvarNota = task => syncTask(task);
 
   // ── COMENTÁRIOS ──
-  const openComs     = tid  => { setComTaskId(String(tid)); setNovoComment(''); setModal('coms'); };
-  const addComment   = e   => {
+  const getComs = taskId => comentarios[String(taskId)] || [];
+  const abrirComs = taskId => { setComentarioTaskId(String(taskId)); setNovoComentario(''); setModal('coms'); };
+  const adicionarCom = e => {
     e.preventDefault();
-    if (!novoComment.trim()) return;
-    const com = { id:Date.now().toString(), texto:novoComment.trim(), autor:nomeUsuario.trim()||'Anônimo', data:new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) };
-    setComentarios(curr=>{ const up={...curr,[comTaskId]:[...(curr[comTaskId]||[]),com]}; save('comentarios',up); return up; });
-    setNovoComment('');
+    if (!novoComentario.trim()) return;
+    const autor = nomeUsuario.trim() || 'Anônimo';
+    const novo = { id:Date.now().toString(), texto:novoComentario.trim(), autor, data:new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) };
+    setComentarios(curr => { const up={...curr,[comentarioTaskId]:[...(curr[comentarioTaskId]||[]),novo]}; save('comentarios',up); return up; });
+    setNovoComentario('');
   };
 
   // ── CLIENTES ──
   const handleAddCliente = e => {
     e.preventDefault();
     if (!novoCliente.name.trim()) return;
-    const p   = paleta(novoCliente.paletaId);
-    const nc  = { id:'c_'+Date.now(), name:novoCliente.name.trim(), paletaId:novoCliente.paletaId, ...p };
-    const upd = [...clientes,nc]; setClientes(upd); save('clientes',upd);
-    setActiveAdTab(nc.id); setModal(null); setNovoCliente({...NOVO_CLI_VAZIO});
+    const p = paleta(novoCliente.paletaId);
+    const c = { id:'c_'+Date.now(), name:novoCliente.name.trim(), paletaId:novoCliente.paletaId, ...p };
+    const updated = [...clientes,c]; setClientes(updated); save('clientes',updated);
+    setModal(null); setNovoCliente({...NOVO_CLIENTE_VAZIO});
+    setActiveAdTab(c.id);
   };
 
   // ── NOVA DEMANDA ──
   const handleCriarDemanda = e => {
     e.preventDefault();
-    const cId = novaDemanda.clientId||(clientes[0]?.id||'');
-    syncTask({...novaDemanda,id:Date.now().toString(),clientId:cId,progress:Number(novaDemanda.progress)||0});
-    setModal(null); setNovaDemanda({...NOVA_DEM_VAZIA});
+    const cId = novaDemanda.clientId || (clientes[0]?.id||'');
+    syncTask({ ...novaDemanda, id:Date.now().toString(), clientId:cId, progress:Number(novaDemanda.progress)||0 });
+    setModal(null); setNovaDemanda({...NOVA_DEMANDA_VAZIA});
   };
 
-  // ── EDITAR ──
-  const openEdit  = task => { setEditingTask({...task}); setModal('editTask'); };
-  const saveEdit  = e    => { e.preventDefault(); syncTask(editingTask); setModal(null); };
-  const finalize  = id   => {
-    const t=tasks.find(t=>String(t.id)===String(id))||editingTask;
-    if(t) syncTask({...t,status:'done',progress:100});
-    if(modal==='editTask') setModal(null);
-  };
+  // ── EDITAR TAREFA ──
+  const abrirEdicao = task => { setEditingTask({...task}); setModal('editTask'); };
+  const salvarEdicao = e => { e.preventDefault(); syncTask(editingTask); setModal(null); };
 
-  // ── ADD CRIATIVO ──
+  // ── CRIATIVO ──
   const handleAddCriativo = e => {
     e.preventDefault();
-    syncList(setCriativos,'criativos',{...newCreative,id:Date.now().toString(),clientId:newCreative.clientId||(clientes[0]?.id||''),status:'pendente'});
+    const cId = newCreative.clientId || (clientes[0]?.id||'');
+    syncCriativo({...newCreative, id:Date.now().toString(), clientId:cId, status:'pendente'});
     setModal(null); setNewCreative({title:'CRIATIVO NOVO: ',content:'',clientId:'',link:''});
   };
 
-  // ── ADD ANÚNCIO ──
+  // ── ANÚNCIO ──
   const handleAddAnuncio = e => {
     e.preventDefault();
-    syncList(setAnuncios,'anuncios',{...newAd,id:Date.now().toString(),clientId:newAd.clientId||(clientes[0]?.id||'')});
+    const cId = newAd.clientId || (clientes[0]?.id||'');
+    syncAnuncio({...newAd, id:Date.now().toString(), clientId:cId});
     setModal(null); setNewAd({title:'',copy:'',clientId:'',platform:'Meta',imageUrl:''});
   };
 
   const closeModal = () => setModal(null);
 
-  // ═══════════════════════════════════════════════════════════════
+  // ─────────────────────────────────────────────────────────────
   // RENDER
-  // ═══════════════════════════════════════════════════════════════
+  // ─────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#070b14] font-sans text-gray-200 selection:bg-fuchsia-500/30 pb-24 overflow-x-hidden">
+    <div className="min-h-screen bg-[#070b14] font-sans text-gray-200 overflow-x-hidden selection:bg-fuchsia-500/30 pb-24">
 
-      {/* BG */}
+      {/* BG orbs */}
       <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-15%] left-[-10%] w-[45%] h-[45%] rounded-full bg-purple-900/15 blur-[130px]"/>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/15 blur-[120px]"/>
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-900/20 blur-[120px]"/>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-900/20 blur-[120px]"/>
       </div>
 
-      <main className="max-w-screen-2xl mx-auto p-5 lg:p-8 space-y-10">
+      <main className="max-w-7xl mx-auto p-6 lg:p-10 space-y-12">
 
-        {/* ══ HEADER ══ */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-white/5 pb-7">
+        {/* ═══ HEADER ═══ */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <i className="fa-solid fa-wand-magic-sparkles text-fuchsia-400 text-sm"/>
-              <span className="text-xs font-bold tracking-widest text-fuchsia-400 uppercase">Tráfego Studio</span>
+            <div className="flex items-center gap-2 mb-2">
+              <i className="fa-solid fa-wand-magic-sparkles text-fuchsia-400"/>
+              <span className="text-sm font-semibold tracking-wider text-fuchsia-400 uppercase">Tráfego Studio</span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-500 tracking-tight">
               Central de Produção
             </h1>
-            <p className="text-gray-500 mt-2 flex items-center gap-2 text-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-emerald-400"/>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"/>
+            <p className="text-gray-400 mt-2 flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-blue-400"/>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"/>
               </span>
-              Salvo localmente · Arraste os cards para mover entre colunas
+              Salvo localmente no navegador
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {COLUNAS.map(col=>{
-              const count = tasks.filter(t=>t.status===col.id).length;
-              return (
-                <div key={col.id} className={`${col.headerBg} border ${col.border} rounded-xl px-4 py-2 text-center min-w-[56px]`}>
-                  <div className={`text-xl font-black ${col.color}`}>{String(count).padStart(2,'0')}</div>
-                  <div className="text-[9px] text-gray-500 uppercase tracking-wider mt-0.5">{col.label}</div>
-                </div>
-              );
-            })}
-            <button onClick={()=>{ setNovaDemanda({...NOVA_DEM_VAZIA,clientId:clientes[0]?.id||''}); setModal('novadem'); }}
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/20 ml-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl px-5 py-3 backdrop-blur-md">
+              <div className="text-2xl font-bold text-yellow-400">{String(inboxTasks.length).padStart(2,'0')}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Solicitações</div>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 backdrop-blur-md">
+              <div className="text-2xl font-bold text-white">{String(doingTasks.length).padStart(2,'0')}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider mt-1">Em Foco</div>
+            </div>
+            <button onClick={()=>{ setNovaDemanda({...NOVA_DEMANDA_VAZIA,clientId:clientes[0]?.id||''}); setModal('novadem'); }}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white border border-purple-500/50 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/20">
               <i className="fa-solid fa-plus"/> Nova Demanda
             </button>
             <button onClick={()=>setModal('cliente')}
-              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5">
+              className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 px-5 py-3 rounded-2xl text-sm font-bold transition-all hover:-translate-y-0.5">
               <i className="fa-solid fa-user-plus"/> Cliente
             </button>
           </div>
         </header>
 
-        {/* ══ KANBAN BOARD ══ */}
-        <section>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="p-2.5 bg-orange-500/20 text-orange-400 rounded-lg flex items-center justify-center">
-              <i className="fa-solid fa-table-columns text-sm"/>
+        {/* ═══ INBOX ═══ */}
+        <section className="bg-yellow-500/5 border border-yellow-500/20 rounded-3xl p-6 lg:p-8 relative overflow-hidden">
+          <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"/>
+          <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="p-3 bg-yellow-500/20 text-yellow-400 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+              <i className="fa-solid fa-inbox"/>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Esteira de Demandas</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Arraste os cards entre colunas para atualizar o status</p>
+              <h2 className="text-2xl font-bold text-white">Solicitações do Juan</h2>
+              <p className="text-sm text-gray-400">Aguardando aprovação e triagem do Marketing</p>
             </div>
           </div>
 
-          <div className="kanban-wrap">
-            {COLUNAS.map(col => {
-              const colTasks = tasks.filter(t=>t.status===col.id);
-              const isOver   = dragOverCol===col.id;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+            {inboxTasks.map(task => {
+              const cl = clienteById(task.clientId);
+              const nComs = getComs(task.id).length;
               return (
-                <div key={col.id} className="kanban-col"
-                  onDragOver={e=>onDragOver(e,col.id)}
-                  onDragLeave={onDragLeave}
-                  onDrop={e=>onDrop(e,col.id)}>
-
-                  {/* Col Header */}
-                  <div className={`flex items-center justify-between mb-3 px-1`}>
-                    <div className="flex items-center gap-2">
-                      <i className={`fa-solid ${col.icon} ${col.color} text-xs`}/>
-                      <span className={`text-sm font-bold ${col.color}`}>{col.label}</span>
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${col.bg} ${col.color} border ${col.border}`}>
-                        {colTasks.length}
-                      </span>
+                <div key={task.id} className="bg-gray-900/60 border border-yellow-500/20 p-5 rounded-2xl flex flex-col justify-between hover:border-yellow-500/40 transition-colors">
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                      {task.prioridade && task.prioridade!=='Normal' && (
+                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md border flex items-center gap-1 ${prioridadeCor(task.prioridade)}`}>
+                          {task.prioridade==='Urgente'?'🔴':'🟠'} {task.prioridade}
+                        </span>
+                      )}
                     </div>
-                    {col.id==='inbox'&&(
-                      <button onClick={()=>{ setNovaDemanda({...NOVA_DEM_VAZIA,clientId:clientes[0]?.id||'',status:'inbox'}); setModal('novadem'); }}
-                        className="text-gray-600 hover:text-gray-400 transition-colors text-xs">
-                        <i className="fa-solid fa-plus"/>
-                      </button>
-                    )}
+                    <h4 className="text-white font-semibold mb-1">{task.title}</h4>
+                    {task.solicitante && <p className="text-xs text-gray-500 mb-1"><i className="fa-regular fa-user mr-1"/>{task.solicitante}</p>}
+                    <p className="text-xs text-gray-400">Prazo: <strong className="text-gray-300">{task.deadline}</strong>{task.platform&&<span className="text-gray-500"> · {task.platform}</span>}</p>
                   </div>
-
-                  {/* Col Body */}
-                  <div className={`kanban-col-body border ${col.border} ${col.bg} ${isOver?'drag-over':''}`}>
-
-                    {/* Drop zone visual quando vazio */}
-                    {colTasks.length===0&&(
-                      <div className={`h-full min-h-[120px] flex flex-col items-center justify-center border-2 border-dashed ${isOver?`${col.border} opacity-70`:'border-white/5 opacity-40'} rounded-xl transition-all`}>
-                        <i className={`fa-solid ${col.icon} ${col.color} text-xl mb-2 opacity-50`}/>
-                        <p className="text-xs text-gray-600">Solte aqui</p>
-                      </div>
-                    )}
-
-                    {/* Cards */}
-                    {colTasks.map(task=>{
-                      const cl = cById(task.clientId);
-                      const nComs = getComs(task.id).length;
-                      const isDragging = draggingId===task.id;
-                      const pc = prioColor(task.prioridade);
-                      return (
-                        <div key={task.id}
-                          draggable={true}
-                          onDragStart={e=>onDragStart(e,task.id)}
-                          onDragEnd={onDragEnd}
-                          className={`task-card group relative bg-[#111827] border border-white/8 rounded-2xl mb-2.5 overflow-hidden hover:border-white/20 hover:shadow-lg hover:shadow-black/40 ${isDragging?'dragging':''}`}>
-
-                          {/* Gradient left bar */}
-                          <div className={`absolute top-0 left-0 w-0.5 h-full bg-gradient-to-b ${cl.theme}`}/>
-
-                          <div className="p-4 pl-5">
-                            {/* Top row */}
-                            <div className="flex items-start justify-between gap-2 mb-2.5">
-                              <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-md ${cl.bg} ${cl.text} border ${cl.border} flex-shrink-0`}>{cl.name}</span>
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                {pc&&<span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border ${pc}`}>{task.prioridade==='Urgente'?'🔴':'🟠'} {task.prioridade}</span>}
-                                <i className="fa-solid fa-grip-vertical text-gray-700 group-hover:text-gray-500 text-xs transition-colors cursor-grab"/>
-                              </div>
-                            </div>
-
-                            {/* Title */}
-                            <h4 className="text-sm font-bold text-white leading-snug mb-2 pr-1">{task.title}</h4>
-
-                            {/* Meta */}
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {task.solicitante&&(
-                                <span className="flex items-center gap-1 text-[10px] text-gray-500 bg-white/4 px-2 py-0.5 rounded-md">
-                                  <i className="fa-regular fa-user text-[9px]"/>{task.solicitante}
-                                </span>
-                              )}
-                              {task.platform&&(
-                                <span className="flex items-center gap-1 text-[10px] text-gray-500 bg-white/4 px-2 py-0.5 rounded-md">
-                                  <i className="fa-solid fa-share-nodes text-[9px]"/>{task.platform}
-                                </span>
-                              )}
-                              {task.deadline&&(
-                                <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md ${task.prioridade==='Urgente'?'text-red-400 bg-red-500/10':'text-gray-500 bg-white/4'}`}>
-                                  <i className="fa-regular fa-clock text-[9px]"/>{task.deadline}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Progress bar (só se tiver) */}
-                            {task.progress!=null&&task.progress>0&&(
-                              <div className="mb-3">
-                                <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
-                                  <div className={`h-1.5 rounded-full bg-gradient-to-r ${cl.theme}`} style={{width:`${task.progress}%`}}/>
-                                </div>
-                                <span className={`text-[9px] ${cl.text} mt-0.5 block text-right`}>{task.progress}%</span>
-                              </div>
-                            )}
-
-                            {/* Notes preview */}
-                            {task.notes&&(
-                              <p className="text-[10px] text-gray-600 bg-white/3 rounded-lg px-2.5 py-1.5 mb-3 line-clamp-2 leading-relaxed italic">"{task.notes}"</p>
-                            )}
-
-                            {/* Actions */}
-                            <div className="flex gap-1.5 pt-1">
-                              <button onClick={()=>openComs(task.id)}
-                                className="relative flex items-center gap-1 text-[10px] text-gray-500 hover:text-purple-400 bg-white/4 hover:bg-purple-500/10 border border-transparent hover:border-purple-500/20 px-2.5 py-1.5 rounded-lg transition-all">
-                                <i className="fa-solid fa-comments"/>
-                                <span>Notas</span>
-                                {nComs>0&&<span className="absolute -top-1.5 -right-1.5 bg-purple-500 text-white text-[9px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">{nComs}</span>}
-                              </button>
-                              <button onClick={()=>openEdit(task)}
-                                className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 bg-white/4 hover:bg-blue-500/10 border border-transparent hover:border-blue-500/20 px-2.5 py-1.5 rounded-lg transition-all">
-                                <i className="fa-solid fa-pen-to-square"/><span>Editar</span>
-                              </button>
-                              {task.status!=='done'&&(
-                                <button onClick={()=>finalize(task.id)}
-                                  className="ml-auto flex items-center gap-1 text-[10px] text-gray-500 hover:text-emerald-400 bg-white/4 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 px-2.5 py-1.5 rounded-lg transition-all">
-                                  <i className="fa-solid fa-check"/> Ok
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={()=>aprovarParaFila(task.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-green-500/20 text-gray-300 hover:text-green-400 border border-white/10 hover:border-green-500/30 py-2.5 rounded-xl text-xs font-bold transition-all">
+                      <i className="fa-solid fa-check"/> Aprovar p/ Fila
+                    </button>
+                    <button onClick={()=>abrirComs(task.id)}
+                      className="relative bg-white/5 hover:bg-purple-500/20 text-gray-400 hover:text-purple-400 border border-white/10 hover:border-purple-500/30 px-3 rounded-xl text-xs transition-all">
+                      <i className="fa-solid fa-comments"/>
+                      {nComs>0&&<span className="absolute -top-1.5 -right-1.5 bg-purple-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">{nComs}</span>}
+                    </button>
+                    <button onClick={()=>abrirEdicao(task)}
+                      className="bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/10 px-3 rounded-xl text-xs transition-all">
+                      <i className="fa-regular fa-pen-to-square"/>
+                    </button>
                   </div>
                 </div>
               );
             })}
+            {inboxTasks.length===0&&(
+              <div className="col-span-full py-8 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
+                <p className="text-gray-500">Caixa de entrada zerada! 🎉</p>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ══ LINHA: CRIATIVOS + ANÚNCIOS ══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 pt-2 border-t border-white/5">
+        {/* ═══ ESTEIRA + LATERAL ═══ */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* Fábrica de Criativos */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-fuchsia-500/20 text-fuchsia-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-palette text-sm"/></div>
-                <h2 className="text-lg font-bold text-white">Fábrica de Criativos</h2>
-              </div>
-              <button onClick={()=>{ setNewCreative({title:'CRIATIVO NOVO: ',content:'',clientId:clientes[0]?.id||'',link:''}); setModal('criativo'); }}
-                className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
-                <i className="fa-solid fa-plus"/> Solicitar
-              </button>
+          {/* ESTEIRA DE PRODUÇÃO */}
+          <section className="lg:col-span-7 space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-orange-500/20 text-orange-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-fire"/></div>
+              <h2 className="text-2xl font-bold text-white">Esteira de Produção</h2>
             </div>
 
-            <div className="bg-fuchsia-900/10 border border-fuchsia-500/20 rounded-2xl p-3 space-y-3">
-              {criativos.map(cr=>{
-                const cl = cById(cr.clientId);
+            <div className="grid gap-5">
+              {doingTasks.map(task => {
+                const cl = clienteById(task.clientId);
+                const nComs = getComs(task.id).length;
+                const isDragging = dragState.draggingId === task.id;
+                const isOverTop  = dragState.overId === task.id && dragState.overPos === 'top';
+                const isOverBot  = dragState.overId === task.id && dragState.overPos === 'bottom';
                 return (
-                  <div key={cr.id} className="bg-gray-900/80 border border-white/5 p-4 rounded-xl">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                  <div key={task.id}
+                    draggable={true}
+                    onDragStart={e => handleDragStart(e, task.id)}
+                    onDragOver={e => handleDragOver(e, task.id, e.currentTarget)}
+                    onDragEnd={handleDragEnd}
+                    className={`drag-card relative rounded-3xl bg-gray-900/50 border p-1 overflow-hidden backdrop-blur-sm transition-all duration-300
+                      ${isDragging ? 'is-dragging border-white/5' : 'border-white/5 hover:border-white/20'}
+                      ${isOverTop  ? 'drag-over-top'    : ''}
+                      ${isOverBot  ? 'drag-over-bottom' : ''}
+                    `}>
+                    <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${cl.theme}`}/>
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Drag handle */}
+                          <span className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing transition-colors" title="Arraste para reordenar">
+                            <i className="fa-solid fa-grip-vertical text-xs"/>
+                          </span>
+                          <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                          {task.solicitante&&<span className="text-xs text-gray-500"><i className="fa-regular fa-user mr-1"/>{task.solicitante}</span>}
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-black/40 px-3 py-1 rounded-full">
+                            <i className="fa-regular fa-clock text-orange-400"/> {task.deadline}
+                          </span>
+                          <button onClick={()=>abrirEdicao(task)} className="bg-white/5 hover:bg-white/10 text-gray-300 px-3 py-1 rounded-full text-xs font-bold transition-colors border border-white/10">
+                            <i className="fa-solid fa-pen mr-1"/>Editar
+                          </button>
+                        </div>
+                      </div>
+
+                      <h3 className="text-xl font-bold text-white mb-4 pr-4">{task.title}</h3>
+
+                      <div className="flex items-center gap-4 mb-6 bg-black/30 p-3 rounded-xl border border-white/5 flex-wrap">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Iniciado em</span>
+                          <span className="text-sm font-semibold text-gray-300">{task.startDate?new Date(task.startDate+'T12:00:00').toLocaleDateString('pt-BR'):'Não definido'}</span>
+                        </div>
+                        <div className="w-px h-8 bg-white/10"/>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Tempo na Esteira</span>
+                          <span className="text-sm font-bold text-orange-400">{getTempoDecorrido(task.startDate)}</span>
+                        </div>
+                        {task.platform&&<><div className="w-px h-8 bg-white/10"/>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Plataforma</span>
+                          <span className="text-sm font-semibold text-gray-300">{task.platform}</span>
+                        </div></>}
+                      </div>
+
+                      <div className="space-y-2 mb-6">
+                        <div className="flex justify-between text-xs text-gray-400 font-medium">
+                          <span>Progresso da Demanda</span>
+                          <span className={cl.text}>{task.progress||0}%</span>
+                        </div>
+                        <div className="w-full bg-black/50 rounded-full h-2.5 overflow-hidden">
+                          <div className={`h-2.5 rounded-full bg-gradient-to-r ${cl.theme} relative`} style={{width:`${task.progress||0}%`}}>
+                            <div className="absolute top-0 right-0 bottom-0 w-4 bg-white/30 animate-pulse"/>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Mural */}
+                      <div className={`p-1 rounded-2xl bg-gradient-to-br ${cl.theme} shadow-lg shadow-black/20`}>
+                        <div className="bg-black/40 backdrop-blur-md rounded-xl p-3">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 mb-2">
+                            <i className="fa-solid fa-pen-to-square"/> Observações / Mural
+                          </span>
+                          <textarea
+                            className="w-full bg-black/20 text-white placeholder-white/50 text-sm p-3 rounded-lg border border-white/10 outline-none focus:border-white/40 transition-all resize-y min-h-[70px]"
+                            placeholder="Escreva aqui suas ideias, links úteis..."
+                            value={task.notes||''}
+                            onChange={e=>atualizarNota(task.id,e.target.value)}
+                            onBlur={()=>salvarNota(task)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botões */}
+                      <div className="flex gap-3 mt-4">
+                        <button onClick={()=>abrirComs(task.id)}
+                          className="flex-1 relative flex items-center justify-center gap-2 bg-purple-600/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 hover:border-purple-500/40 py-2.5 rounded-xl text-xs font-bold transition-all">
+                          <i className="fa-solid fa-comments"/> Comentários
+                          {nComs>0&&<span className="absolute -top-2 -right-2 bg-purple-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{nComs}</span>}
+                        </button>
+                        <button onClick={()=>moverParaFinalizado(task.id)}
+                          className="flex-1 flex items-center justify-center gap-2 bg-emerald-600/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 py-2.5 rounded-xl text-xs font-bold transition-all">
+                          <i className="fa-solid fa-check-double"/> Finalizar
+                        </button>
+                      </div>
                     </div>
-                    <h4 className="font-bold text-white text-sm mb-1">{cr.title}</h4>
-                    <p className="text-xs text-gray-400 mb-3 line-clamp-2">{cr.content}</p>
-                    {cr.link&&<a href={cr.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-md mb-3 border border-blue-500/20"><i className="fa-solid fa-link"/> Referência</a>}
-                    <button onClick={()=>delItem(setCriativos,'criativos',cr.id)}
-                      className="w-full py-1.5 rounded-lg border border-white/10 text-xs text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all flex items-center justify-center gap-2">
-                      <i className="fa-solid fa-check"/> Entregue
-                    </button>
                   </div>
                 );
               })}
-              {criativos.length===0&&<p className="text-center text-gray-500 text-sm py-6">Nenhum criativo na fila.</p>}
+              {doingTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma tarefa em foco no momento.</p>}
             </div>
-          </div>
+          </section>
 
-          {/* Campanhas no Ar */}
-          <div className="lg:col-span-3 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-green-500/20 text-green-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-bolt text-sm"/></div>
-                <div>
-                  <h2 className="text-lg font-bold text-white">Campanhas no Ar</h2>
-                  <p className="text-xs text-gray-500">Anúncios ativos na vitrine</p>
+          {/* LATERAL: CRIATIVOS + FILA */}
+          <section className="lg:col-span-5 space-y-8">
+
+            {/* Fábrica de Criativos */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-fuchsia-500/20 text-fuchsia-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-palette"/></div>
+                  <h2 className="text-xl font-bold text-white">Fábrica de Criativos</h2>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 flex-wrap gap-1">
-                  {clientes.map(cl=>(
-                    <button key={cl.id} onClick={()=>setActiveAdTab(cl.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeAdTab===cl.id?`${cl.bg} ${cl.text}`:'text-gray-500 hover:text-gray-300'}`}>
-                      {cl.name}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={()=>{ setNewAd({title:'',copy:'',clientId:activeAdTab,platform:'Meta',imageUrl:''}); setModal('anuncio'); }}
-                  className="bg-green-600/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
-                  <i className="fa-solid fa-plus"/> Anúncio
+                <button onClick={()=>{ setNewCreative({title:'CRIATIVO NOVO: ',content:'',clientId:clientes[0]?.id||'',link:''}); setModal('criativo'); }}
+                  className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2">
+                  <i className="fa-solid fa-plus"/> Solicitar
                 </button>
               </div>
+
+              <div className="bg-fuchsia-900/10 border border-fuchsia-500/20 rounded-3xl p-4 space-y-4 backdrop-blur-sm">
+                {criativos.map(cr => {
+                  const cl = clienteById(cr.clientId);
+                  return (
+                    <div key={cr.id} className="bg-gray-900/80 border border-white/5 p-4 rounded-2xl">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
+                      </div>
+                      <h4 className="font-bold text-white text-sm mb-1">{cr.title}</h4>
+                      <p className="text-xs text-gray-400 mb-3 line-clamp-2">{cr.content}</p>
+                      {cr.link&&<a href={cr.link} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-md mb-3 border border-blue-500/20">
+                        <i className="fa-solid fa-link"/> Link / Referência
+                      </a>}
+                      <button onClick={()=>delFromList(setCriativos,'criativos',cr.id)}
+                        className="w-full py-1.5 rounded-lg border border-white/10 text-xs text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border-green-500/30 transition-all flex items-center justify-center gap-2">
+                        <i className="fa-solid fa-check"/> Marcar como Entregue
+                      </button>
+                    </div>
+                  );
+                })}
+                {criativos.length===0&&<p className="text-center text-gray-500 text-sm py-4">Nenhum criativo na fila.</p>}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {anuncios.filter(ad=>ad.clientId===activeAdTab).map(ad=>{
-                const cl = cById(ad.clientId);
-                return (
-                  <div key={ad.id} className="group flex flex-col bg-gray-900/40 border border-white/10 rounded-2xl overflow-hidden hover:border-white/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/50">
-                    <div className="h-36 relative bg-black/50 overflow-hidden flex items-center justify-center">
-                      {ad.imageUrl?(<>
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent z-10"/>
-                        <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"/>
-                      </>):(
-                        <div className="text-center z-10"><i className="fa-regular fa-image text-3xl text-gray-600"/></div>
-                      )}
-                      <div className="absolute top-3 left-3 z-20">
-                        <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[9px] uppercase font-black px-2.5 py-1 rounded-full flex items-center backdrop-blur-md">
-                          <span className="w-1 h-1 bg-green-400 rounded-full mr-1.5 animate-pulse"/> Rodando
-                        </span>
+            {/* Esteira / Fila */}
+            <div className="space-y-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-chart-line"/></div>
+                <h2 className="text-xl font-bold text-white">Esteira / Demandas</h2>
+              </div>
+              <div className="bg-gray-900/30 border border-white/5 rounded-3xl p-2 backdrop-blur-sm max-h-[400px] overflow-y-auto">
+                {queueTasks.map(task => {
+                  const cl = clienteById(task.clientId);
+                  return (
+                    <div key={task.id} className="group p-4 flex items-center justify-between hover:bg-white/5 rounded-2xl transition-colors border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${cl.theme}`}/>
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-200 group-hover:text-white">{task.title}</h4>
+                          <p className={`text-xs mt-1 ${cl.text}`}>{cl.name} · <span className="text-gray-500">{task.platform}</span></p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded-md border border-white/5">{task.status==='review'?'Aprovação':'Fila'}</span>
+                        <button onClick={()=>abrirEdicao(task)} className="opacity-0 group-hover:opacity-100 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded text-xs transition-all">
+                          <i className="fa-solid fa-play"/>
+                        </button>
                       </div>
                     </div>
-                    <div className="p-4 flex-1 bg-gray-900/60 backdrop-blur-xl">
-                      <h4 className="text-sm font-bold text-white mb-2 line-clamp-1">{ad.title}</h4>
-                      <p className="text-xs text-gray-500 leading-relaxed italic line-clamp-3">"{ad.copy}"</p>
-                      <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2">
-                        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">{ad.platform}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${cl.bg} ${cl.text} border ${cl.border} ml-auto`}>{cl.name}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {anuncios.filter(ad=>ad.clientId===activeAdTab).length===0&&(
-                <div className="col-span-full py-12 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
-                  <p className="text-gray-600">Nenhum anúncio cadastrado para este cliente.</p>
-                </div>
-              )}
+                  );
+                })}
+                {queueTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma demanda na esteira.</p>}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* ═══ FINALIZADAS ═══ */}
+        <section className="pt-10 border-t border-white/5 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-check-double"/></div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Projetos & Demandas Finalizadas</h2>
+              <p className="text-sm text-gray-400">Histórico de entregas recentes.</p>
             </div>
           </div>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {doneTasks.map(task => {
+              const cl = clienteById(task.clientId);
+              return (
+                <div key={task.id} className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4 opacity-80 hover:opacity-100 transition-opacity">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0"><i className="fa-solid fa-check"/></div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white line-clamp-1">{task.title}</h4>
+                    <p className={`text-xs mt-0.5 font-semibold uppercase tracking-wider ${cl.text}`}>{cl.name}</p>
+                  </div>
+                </div>
+              );
+            })}
+            {doneTasks.length===0&&(
+              <div className="col-span-full py-10 text-center border border-white/5 border-dashed rounded-2xl bg-white/[0.01]">
+                <p className="text-gray-500">Nenhum projeto finalizado ainda.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ═══ CAMPANHAS NO AR ═══ */}
+        <section className="pt-10 border-t border-white/5 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-500/20 text-green-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-bolt"/></div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Campanhas no Ar</h2>
+                <p className="text-sm text-gray-400">Anúncios cadastrados manualmente para vitrine.</p>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/10 backdrop-blur-md flex-wrap gap-1">
+                {clientes.map(cl=>(
+                  <button key={cl.id} onClick={()=>setActiveAdTab(cl.id)}
+                    className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${activeAdTab===cl.id?`${cl.bg} ${cl.text} shadow-md`:'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+                    {cl.name}
+                  </button>
+                ))}
+              </div>
+              <button onClick={()=>{ setNewAd({title:'',copy:'',clientId:activeAdTab,platform:'Meta',imageUrl:''}); setModal('anuncio'); }}
+                className="bg-green-600/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+                <i className="fa-solid fa-plus"/> Cadastrar Anúncio
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {anuncios.filter(ad=>ad.clientId===activeAdTab).map(ad=>{
+              const cl = clienteById(ad.clientId);
+              return (
+                <div key={ad.id} className="group flex flex-col bg-gray-900/40 border border-white/10 rounded-3xl overflow-hidden hover:border-white/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50">
+                  <div className="h-48 relative bg-black/50 flex items-center justify-center overflow-hidden">
+                    {ad.imageUrl?(<>
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent z-10"/>
+                      <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105"/>
+                    </>):(
+                      <div className="text-center z-10"><i className="fa-regular fa-image text-4xl text-gray-600 mb-2"/><span className="text-xs text-gray-500 uppercase tracking-wider font-bold block">Sem imagem</span></div>
+                    )}
+                    <div className="absolute top-4 left-4 z-20">
+                      <span className="bg-green-500/20 text-green-400 border border-green-500/30 text-[10px] uppercase font-black px-3 py-1.5 rounded-full flex items-center backdrop-blur-md">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2 animate-pulse"/> Rodando
+                      </span>
+                    </div>
+                    <div className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-md p-2 rounded-xl border border-white/10 text-gray-300">
+                      {ad.platform==='Meta'?<i className="fa-brands fa-facebook text-blue-400"/>:<i className="fa-solid fa-magnifying-glass text-red-400"/>}
+                    </div>
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col z-10 bg-gray-900/60 backdrop-blur-xl">
+                    <h4 className="text-lg font-bold text-white mb-4 line-clamp-1">{ad.title}</h4>
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/5 flex-1 relative mb-4">
+                      <div className={`absolute top-0 left-4 w-8 h-1 bg-gradient-to-r ${cl.theme} rounded-b-full`}/>
+                      <p className="text-sm text-gray-400 leading-relaxed italic line-clamp-4">"{ad.copy}"</p>
+                    </div>
+                    <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{ad.platform}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {anuncios.filter(ad=>ad.clientId===activeAdTab).length===0&&(
+              <div className="col-span-full py-20 text-center border border-white/5 border-dashed rounded-3xl bg-white/[0.02]">
+                <p className="text-gray-500 text-lg">Nenhum anúncio cadastrado no momento.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
       </main>
 
@@ -530,123 +648,205 @@ function App() {
           MODAIS
       ═══════════════════════════════════════════════════════ */}
 
-      {/* MODAL: ADICIONAR CLIENTE */}
+      {/* ── MODAL: ADICIONAR CLIENTE ── */}
       {modal==='cliente'&&(
-        <MW onClose={closeModal} border="border-white/20" title="Adicionar Cliente" icon="fa-solid fa-user-plus" ic="text-white">
+        <ModalWrap onClose={closeModal} borderColor="border-white/20" title="Adicionar Cliente" icon="fa-solid fa-user-plus" iconColor="text-white">
           <form onSubmit={handleAddCliente} className="space-y-5">
             <div>
-              <label className="lbl">Nome do Cliente *</label>
-              <input required type="text" placeholder="Ex: Empresa XYZ" className="inp focus:border-white/30"
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Nome do Cliente *</label>
+              <input required type="text" placeholder="Ex: Empresa XYZ"
+                className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-white/30 placeholder-gray-600"
                 value={novoCliente.name} onChange={e=>setNovoCliente({...novoCliente,name:e.target.value})}/>
             </div>
             <div>
-              <label className="lbl">Cor do Cliente</label>
-              <div className="grid grid-cols-4 gap-2.5">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Cor do Cliente</label>
+              <div className="grid grid-cols-4 gap-3">
                 {PALETA.map(p=>(
-                  <button key={p.id} type="button" onClick={()=>setNovoCliente({...novoCliente,paletaId:p.id})}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all ${novoCliente.paletaId===p.id?'border-white/40 bg-white/10':'border-white/5 hover:bg-white/5'}`}>
-                    <div className="w-7 h-7 rounded-full shadow-lg" style={{background:p.dot}}/>
-                    <span className="text-[9px] text-gray-400 font-semibold">{p.label}</span>
+                  <button key={p.id} type="button"
+                    onClick={()=>setNovoCliente({...novoCliente,paletaId:p.id})}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${novoCliente.paletaId===p.id?'border-white/50 bg-white/10':'border-white/5 bg-white/[0.02] hover:bg-white/5'}`}>
+                    <div className="w-8 h-8 rounded-full shadow-lg" style={{background:p.dot}}/>
+                    <span className="text-[10px] text-gray-400 font-semibold">{p.label}</span>
                   </button>
                 ))}
               </div>
             </div>
-            <div className="flex gap-3 pt-1">
+            <div className="flex gap-3 pt-2">
               <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
               <button type="submit" className="flex-1 bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
                 <i className="fa-solid fa-plus"/> Adicionar
               </button>
             </div>
           </form>
-        </MW>
+        </ModalWrap>
       )}
 
-      {/* MODAL: NOVA DEMANDA */}
+      {/* ── MODAL: NOVA DEMANDA ── */}
       {modal==='novadem'&&(
-        <MW onClose={closeModal} border="border-purple-500/30" title="Nova Demanda" icon="fa-solid fa-plus" ic="text-purple-400">
+        <ModalWrap onClose={closeModal} borderColor="border-purple-500/30" title="Nova Demanda" icon="fa-solid fa-plus" iconColor="text-purple-400">
           <form onSubmit={handleCriarDemanda} className="space-y-4">
-            <div><label className="lbl">Título *</label><input required type="text" placeholder="Ex: Campanha Dia dos Namorados" className="inp focus:border-purple-500/50" value={novaDemanda.title} onChange={e=>setNovaDemanda({...novaDemanda,title:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Título da Demanda *</label>
+              <input required type="text" placeholder="Ex: Campanha Dia dos Namorados" className="inp focus:border-purple-500/50"
+                value={novaDemanda.title} onChange={e=>setNovaDemanda({...novaDemanda,title:e.target.value})}/>
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Cliente *</label>
+              <div>
+                <label className="lbl">Cliente *</label>
                 <select className="inp focus:border-purple-500/50" value={novaDemanda.clientId} onChange={e=>setNovaDemanda({...novaDemanda,clientId:e.target.value})}>
                   {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div><label className="lbl">Solicitante</label><input type="text" placeholder="Ex: Juan" className="inp focus:border-purple-500/50" value={novaDemanda.solicitante} onChange={e=>setNovaDemanda({...novaDemanda,solicitante:e.target.value})}/></div>
+              <div>
+                <label className="lbl">Solicitante</label>
+                <input type="text" placeholder="Ex: Juan, Ana..." className="inp focus:border-purple-500/50"
+                  value={novaDemanda.solicitante} onChange={e=>setNovaDemanda({...novaDemanda,solicitante:e.target.value})}/>
+              </div>
             </div>
-            <div><label className="lbl">Responsável</label><input type="text" placeholder="Ex: Ana Silva" className="inp focus:border-purple-500/50" value={novaDemanda.responsavel} onChange={e=>setNovaDemanda({...novaDemanda,responsavel:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Responsável (Marketing)</label>
+              <input type="text" placeholder="Ex: Ana Silva, Marina..." className="inp focus:border-purple-500/50"
+                value={novaDemanda.responsavel} onChange={e=>setNovaDemanda({...novaDemanda,responsavel:e.target.value})}/>
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Status Inicial</label>
+              <div>
+                <label className="lbl">Status Inicial</label>
                 <select className="inp focus:border-purple-500/50" value={novaDemanda.status} onChange={e=>setNovaDemanda({...novaDemanda,status:e.target.value})}>
-                  {COLUNAS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                  <option value="inbox">Inbox (Triagem)</option>
+                  <option value="todo">Fila de Produção</option>
+                  <option value="doing">Em Foco</option>
+                  <option value="review">Revisão</option>
+                  <option value="done">Finalizado</option>
                 </select>
               </div>
-              <div><label className="lbl">Prioridade</label>
+              <div>
+                <label className="lbl">Prioridade</label>
                 <select className="inp focus:border-purple-500/50" value={novaDemanda.prioridade} onChange={e=>setNovaDemanda({...novaDemanda,prioridade:e.target.value})}>
-                  <option value="Normal">Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente 🔴</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Urgente">Urgente 🔴</option>
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Plataforma</label>
+              <div>
+                <label className="lbl">Plataforma</label>
                 <select className="inp focus:border-purple-500/50" value={novaDemanda.platform} onChange={e=>setNovaDemanda({...novaDemanda,platform:e.target.value})}>
                   {['Meta Ads','Google Ads','TikTok Ads','YouTube','LinkedIn','Site/LP','Data Studio','Outros'].map(p=><option key={p}>{p}</option>)}
                 </select>
               </div>
-              <div><label className="lbl">Prazo *</label><input required type="text" placeholder="15/05 ou Urgente" className="inp focus:border-purple-500/50" value={novaDemanda.deadline} onChange={e=>setNovaDemanda({...novaDemanda,deadline:e.target.value})}/></div>
+              <div>
+                <label className="lbl">Prazo *</label>
+                <input required type="text" placeholder="15/05 ou Urgente" className="inp focus:border-purple-500/50"
+                  value={novaDemanda.deadline} onChange={e=>setNovaDemanda({...novaDemanda,deadline:e.target.value})}/>
+              </div>
             </div>
-            <div><label className="lbl">Data de Início</label><input type="date" className="inp focus:border-purple-500/50" value={novaDemanda.startDate} onChange={e=>setNovaDemanda({...novaDemanda,startDate:e.target.value})}/></div>
-            <div><label className="lbl">Progresso: <span className="text-purple-400">{novaDemanda.progress}%</span></label><input type="range" min="0" max="100" className="w-full" value={novaDemanda.progress} onChange={e=>setNovaDemanda({...novaDemanda,progress:e.target.value})}/></div>
-            <div><label className="lbl">Observações</label><textarea rows="2" placeholder="Notas, links..." className="inp focus:border-purple-500/50" value={novaDemanda.notes} onChange={e=>setNovaDemanda({...novaDemanda,notes:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Data de Início</label>
+              <input type="date" className="inp focus:border-purple-500/50"
+                value={novaDemanda.startDate} onChange={e=>setNovaDemanda({...novaDemanda,startDate:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Progresso: <span className="text-purple-400">{novaDemanda.progress}%</span></label>
+              <input type="range" min="0" max="100" className="w-full"
+                value={novaDemanda.progress} onChange={e=>setNovaDemanda({...novaDemanda,progress:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Observações (Opcional)</label>
+              <textarea rows="3" placeholder="Notas, links, contexto..." className="inp focus:border-purple-500/50"
+                value={novaDemanda.notes} onChange={e=>setNovaDemanda({...novaDemanda,notes:e.target.value})}/>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
-              <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors"><i className="fa-solid fa-plus mr-2"/>Criar</button>
+              <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-plus mr-2"/>Criar Demanda
+              </button>
             </div>
           </form>
-        </MW>
+        </ModalWrap>
       )}
 
-      {/* MODAL: EDITAR TAREFA */}
+      {/* ── MODAL: EDITAR TAREFA ── */}
       {modal==='editTask'&&editingTask&&(
-        <MW onClose={closeModal} border="border-blue-500/30" title="Editar Demanda" icon="fa-solid fa-pen-to-square" ic="text-blue-400">
-          <form onSubmit={saveEdit} className="space-y-4">
-            <div><label className="lbl">Título</label><input required type="text" className="inp focus:border-blue-500/50" value={editingTask.title} onChange={e=>setEditingTask({...editingTask,title:e.target.value})}/></div>
+        <ModalWrap onClose={closeModal} borderColor="border-blue-500/30" title="Editar Demanda" icon="fa-solid fa-pen-to-square" iconColor="text-blue-400">
+          <form onSubmit={salvarEdicao} className="space-y-4">
+            <div>
+              <label className="lbl">Título</label>
+              <input required type="text" className="inp focus:border-blue-500/50"
+                value={editingTask.title} onChange={e=>setEditingTask({...editingTask,title:e.target.value})}/>
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Cliente</label>
+              <div>
+                <label className="lbl">Cliente</label>
                 <select className="inp focus:border-blue-500/50" value={editingTask.clientId||clientes[0]?.id} onChange={e=>setEditingTask({...editingTask,clientId:e.target.value})}>
                   {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div><label className="lbl">Solicitante</label><input type="text" className="inp focus:border-blue-500/50" value={editingTask.solicitante||''} onChange={e=>setEditingTask({...editingTask,solicitante:e.target.value})}/></div>
+              <div>
+                <label className="lbl">Solicitante</label>
+                <input type="text" placeholder="Ex: Juan" className="inp focus:border-blue-500/50"
+                  value={editingTask.solicitante||''} onChange={e=>setEditingTask({...editingTask,solicitante:e.target.value})}/>
+              </div>
             </div>
-            <div><label className="lbl">Responsável</label><input type="text" className="inp focus:border-blue-500/50" value={editingTask.responsavel||''} onChange={e=>setEditingTask({...editingTask,responsavel:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Responsável (Marketing)</label>
+              <input type="text" placeholder="Ex: Ana Silva, Marina" className="inp focus:border-blue-500/50"
+                value={editingTask.responsavel||''} onChange={e=>setEditingTask({...editingTask,responsavel:e.target.value})}/>
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Status</label>
+              <div>
+                <label className="lbl">Status</label>
                 <select className="inp focus:border-blue-500/50" value={editingTask.status} onChange={e=>setEditingTask({...editingTask,status:e.target.value})}>
-                  {COLUNAS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                  <option value="inbox">Inbox</option>
+                  <option value="todo">Fila (A Fazer)</option>
+                  <option value="doing">Em Foco</option>
+                  <option value="review">Em Aprovação</option>
+                  <option value="done">Finalizado</option>
                 </select>
               </div>
-              <div><label className="lbl">Prioridade</label>
+              <div>
+                <label className="lbl">Prioridade</label>
                 <select className="inp focus:border-blue-500/50" value={editingTask.prioridade||'Normal'} onChange={e=>setEditingTask({...editingTask,prioridade:e.target.value})}>
-                  <option value="Normal">Normal</option><option value="Alta">Alta</option><option value="Urgente">Urgente 🔴</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Urgente">Urgente 🔴</option>
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Plataforma</label>
+              <div>
+                <label className="lbl">Plataforma</label>
                 <select className="inp focus:border-blue-500/50" value={editingTask.platform||'Meta Ads'} onChange={e=>setEditingTask({...editingTask,platform:e.target.value})}>
                   {['Meta Ads','Google Ads','TikTok Ads','YouTube','LinkedIn','Site/LP','Data Studio','Outros'].map(p=><option key={p}>{p}</option>)}
                 </select>
               </div>
-              <div><label className="lbl">Prazo</label><input type="text" className="inp focus:border-blue-500/50" value={editingTask.deadline||''} onChange={e=>setEditingTask({...editingTask,deadline:e.target.value})}/></div>
+              <div>
+                <label className="lbl">Prazo Final</label>
+                <input type="text" placeholder="10/05 ou Hoje" className="inp focus:border-blue-500/50"
+                  value={editingTask.deadline||''} onChange={e=>setEditingTask({...editingTask,deadline:e.target.value})}/>
+              </div>
             </div>
-            <div><label className="lbl">Data de Início</label><input type="date" className="inp focus:border-blue-500/50" value={editingTask.startDate||''} onChange={e=>setEditingTask({...editingTask,startDate:e.target.value})}/></div>
-            <div><label className="lbl">Progresso: <span className="text-blue-400">{editingTask.progress||0}%</span></label><input type="range" min="0" max="100" className="w-full" value={editingTask.progress||0} onChange={e=>setEditingTask({...editingTask,progress:parseInt(e.target.value)})}/></div>
-            <div><label className="lbl">Observações</label><textarea rows="3" className="inp focus:border-blue-500/50" value={editingTask.notes||''} onChange={e=>setEditingTask({...editingTask,notes:e.target.value})}/></div>
-            <div className="flex gap-3 pt-4 border-t border-white/10">
-              <button type="button" onClick={()=>{ delItem(setTasks,'tasks',editingTask.id); setModal(null); }}
-                className="bg-red-600/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl transition-colors"><i className="fa-solid fa-trash"/></button>
-              <button type="button" onClick={()=>finalize(editingTask.id)}
+            <div>
+              <label className="lbl">Data de Início</label>
+              <input type="date" className="inp focus:border-blue-500/50"
+                value={editingTask.startDate||''} onChange={e=>setEditingTask({...editingTask,startDate:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Progresso: <span className="text-blue-400">{editingTask.progress||0}%</span></label>
+              <input type="range" min="0" max="100" className="w-full"
+                value={editingTask.progress||0} onChange={e=>setEditingTask({...editingTask,progress:parseInt(e.target.value)})}/>
+            </div>
+            <div>
+              <label className="lbl">Observações</label>
+              <textarea rows="3" placeholder="Notas, links, contexto..." className="inp focus:border-blue-500/50"
+                value={editingTask.notes||''} onChange={e=>setEditingTask({...editingTask,notes:e.target.value})}/>
+            </div>
+            <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
+              <button type="button" onClick={()=>{ delFromList(setTasks,'tasks',editingTask.id); setModal(null); }}
+                className="bg-red-600/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 p-3 rounded-xl transition-colors">
+                <i className="fa-solid fa-trash"/>
+              </button>
+              <button type="button" onClick={()=>moverParaFinalizado(editingTask.id)}
                 className="flex-1 bg-emerald-600/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold py-3 rounded-xl transition-colors">
                 <i className="fa-solid fa-check-double mr-2"/>Finalizar
               </button>
@@ -655,117 +855,157 @@ function App() {
               </button>
             </div>
           </form>
-        </MW>
+        </ModalWrap>
       )}
 
-      {/* MODAL: SOLICITAR CRIATIVO */}
+      {/* ── MODAL: SOLICITAR CRIATIVO ── */}
       {modal==='criativo'&&(
-        <MW onClose={closeModal} border="border-fuchsia-500/30" title="Solicitar Criativo" icon="fa-solid fa-palette" ic="text-fuchsia-400">
+        <ModalWrap onClose={closeModal} borderColor="border-fuchsia-500/30" title="Solicitar Criativo" icon="fa-solid fa-palette" iconColor="text-fuchsia-400">
           <form onSubmit={handleAddCriativo} className="space-y-4">
-            <div><label className="lbl">Título</label><input required type="text" className="inp focus:border-fuchsia-500/50" value={newCreative.title} onChange={e=>setNewCreative({...newCreative,title:e.target.value})}/></div>
-            <div><label className="lbl">Cliente</label>
+            <div>
+              <label className="lbl">Título do Criativo</label>
+              <input required type="text" className="inp focus:border-fuchsia-500/50"
+                value={newCreative.title} onChange={e=>setNewCreative({...newCreative,title:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Cliente</label>
               <select className="inp focus:border-fuchsia-500/50" value={newCreative.clientId} onChange={e=>setNewCreative({...newCreative,clientId:e.target.value})}>
                 {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div><label className="lbl">Briefing</label><textarea required rows="3" placeholder="Formato, estilo, referências..." className="inp focus:border-fuchsia-500/50" value={newCreative.content} onChange={e=>setNewCreative({...newCreative,content:e.target.value})}/></div>
-            <div><label className="lbl">Link de Referência (Opcional)</label><input type="url" placeholder="https://..." className="inp focus:border-fuchsia-500/50" value={newCreative.link} onChange={e=>setNewCreative({...newCreative,link:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Briefing / Conteúdo</label>
+              <textarea required rows="3" placeholder="Descreva o que precisa: formato, estilo, mensagem..." className="inp focus:border-fuchsia-500/50"
+                value={newCreative.content} onChange={e=>setNewCreative({...newCreative,content:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Link de Referência (Opcional)</label>
+              <input type="url" placeholder="https://drive.google.com/..." className="inp focus:border-fuchsia-500/50"
+                value={newCreative.link} onChange={e=>setNewCreative({...newCreative,link:e.target.value})}/>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
               <button type="submit" className="flex-1 bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-3 rounded-xl transition-colors">Solicitar</button>
             </div>
           </form>
-        </MW>
+        </ModalWrap>
       )}
 
-      {/* MODAL: CADASTRAR ANÚNCIO */}
+      {/* ── MODAL: CADASTRAR ANÚNCIO ── */}
       {modal==='anuncio'&&(
-        <MW onClose={closeModal} border="border-green-500/30" title="Cadastrar Anúncio Ativo" icon="fa-solid fa-bolt" ic="text-green-400">
+        <ModalWrap onClose={closeModal} borderColor="border-green-500/30" title="Cadastrar Anúncio Ativo" icon="fa-solid fa-bolt" iconColor="text-green-400">
           <form onSubmit={handleAddAnuncio} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="lbl">Cliente</label>
+              <div>
+                <label className="lbl">Cliente</label>
                 <select className="inp focus:border-green-500/50" value={newAd.clientId} onChange={e=>setNewAd({...newAd,clientId:e.target.value})}>
                   {clientes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div><label className="lbl">Plataforma</label>
+              <div>
+                <label className="lbl">Plataforma</label>
                 <select className="inp focus:border-green-500/50" value={newAd.platform} onChange={e=>setNewAd({...newAd,platform:e.target.value})}>
-                  <option value="Meta">Meta Ads</option><option value="Google">Google Ads</option><option value="TikTok">TikTok Ads</option>
+                  <option value="Meta">Meta Ads</option>
+                  <option value="Google">Google Ads</option>
+                  <option value="TikTok">TikTok Ads</option>
                 </select>
               </div>
             </div>
-            <div><label className="lbl">Nome do Anúncio</label><input required type="text" placeholder="Ex: Carrossel Dia das Mães" className="inp focus:border-green-500/50" value={newAd.title} onChange={e=>setNewAd({...newAd,title:e.target.value})}/></div>
-            <div><label className="lbl">Copy (Texto)</label><textarea required rows="3" className="inp focus:border-green-500/50" value={newAd.copy} onChange={e=>setNewAd({...newAd,copy:e.target.value})}/></div>
-            <div><label className="lbl">Link da Imagem (Opcional)</label><input type="url" placeholder="https://..." className="inp focus:border-green-500/50" value={newAd.imageUrl} onChange={e=>setNewAd({...newAd,imageUrl:e.target.value})}/></div>
+            <div>
+              <label className="lbl">Nome do Anúncio</label>
+              <input required type="text" placeholder="Ex: Carrossel Dia das Mães" className="inp focus:border-green-500/50"
+                value={newAd.title} onChange={e=>setNewAd({...newAd,title:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Copy (Texto do Anúncio)</label>
+              <textarea required rows="3" className="inp focus:border-green-500/50"
+                value={newAd.copy} onChange={e=>setNewAd({...newAd,copy:e.target.value})}/>
+            </div>
+            <div>
+              <label className="lbl">Link da Imagem (Opcional)</label>
+              <input type="url" placeholder="https://..." className="inp focus:border-green-500/50"
+                value={newAd.imageUrl} onChange={e=>setNewAd({...newAd,imageUrl:e.target.value})}/>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={closeModal} className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
-              <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition-colors">Publicar</button>
+              <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition-colors">Publicar no Painel</button>
             </div>
           </form>
-        </MW>
+        </ModalWrap>
       )}
 
-      {/* MODAL: COMENTÁRIOS */}
-      {modal==='coms'&&comTaskId&&(()=>{
-        const t   = tasks.find(x=>String(x.id)===comTaskId);
-        const cl  = t ? cById(t.clientId) : clientes[0];
-        const cms = getComs(comTaskId);
+      {/* ── MODAL: COMENTÁRIOS ── */}
+      {modal==='coms'&&comentarioTaskId&&(()=>{
+        const taskCom = tasks.find(t=>String(t.id)===comentarioTaskId);
+        const cl = taskCom ? clienteById(taskCom.clientId) : clientes[0];
+        const listaComs = getComs(comentarioTaskId);
         return (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4" onClick={closeModal}>
             <div className="bg-[#0d1220] border border-purple-500/30 rounded-t-3xl md:rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh] slide-up" onClick={e=>e.stopPropagation()}>
 
-              <div className="flex items-center justify-between p-5 border-b border-white/5">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/5">
                 <div className="flex items-center gap-3">
-                  {t&&<span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>}
+                  {taskCom&&<span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>}
                   <div>
-                    <h2 className="text-base font-bold text-white flex items-center gap-2"><i className="fa-solid fa-comments text-purple-400"/> Comentários</h2>
-                    {t&&<p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{t.title}</p>}
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2"><i className="fa-solid fa-comments text-purple-400"/> Comentários</h2>
+                    {taskCom&&<p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{taskCom.title}</p>}
                   </div>
                 </div>
-                <button onClick={closeModal} className="text-gray-500 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-lg"/></button>
+                <button onClick={closeModal} className="text-gray-500 hover:text-white transition-colors">
+                  <i className="fa-solid fa-xmark text-xl"/>
+                </button>
               </div>
 
-              <div className="px-5 pt-3 pb-2 border-b border-white/5">
-                <label className="lbl">Você é:</label>
-                <input type="text" placeholder="Seu nome (ex: Juan, Ana...)" className="inp focus:border-purple-500/40 py-2"
-                  value={nomeUsuario} onChange={e=>{ setNomeUsuario(e.target.value); save('nomeUsuario',e.target.value); }}/>
+              {/* Seletor de usuário */}
+              <div className="px-6 pt-4 pb-2 border-b border-white/5">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Quem é você?</label>
+                <input type="text" placeholder="Seu nome (ex: Juan, Ana...)"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-purple-500/40 placeholder-gray-600"
+                  value={nomeUsuario}
+                  onChange={e=>{ setNomeUsuario(e.target.value); save('nomeUsuario',e.target.value); }}/>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                {cms.length===0&&(
+              {/* Lista */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {listaComs.length===0&&(
                   <div className="text-center py-10">
                     <i className="fa-regular fa-comment-dots text-4xl text-gray-700 mb-3 block"/>
                     <p className="text-gray-500 text-sm">Nenhum comentário ainda.</p>
+                    <p className="text-gray-600 text-xs mt-1">Seja o primeiro a comentar!</p>
                   </div>
                 )}
-                {cms.map(c=>(
-                  <div key={c.id} className="flex gap-3">
+                {listaComs.map(com=>(
+                  <div key={com.id} className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-purple-400 text-xs font-black">{(c.autor||'?')[0].toUpperCase()}</span>
+                      <span className="text-purple-400 text-xs font-black">{(com.autor||'?')[0].toUpperCase()}</span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-purple-300">{c.autor}</span>
-                        <span className="text-[10px] text-gray-600">{c.data}</span>
+                        <span className="text-xs font-bold text-purple-300">{com.autor}</span>
+                        <span className="text-[10px] text-gray-600">{com.data}</span>
                       </div>
                       <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3">
-                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{c.texto}</p>
+                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{com.texto}</p>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
 
+              {/* Input */}
               <div className="p-4 border-t border-white/5">
-                <form onSubmit={addComment} className="flex gap-3">
+                <form onSubmit={adicionarCom} className="flex gap-3">
                   <textarea rows="1" placeholder="Escreva um comentário... (Enter para enviar)"
-                    className="flex-1 bg-black/50 border border-white/10 rounded-2xl px-4 py-2.5 text-white text-sm outline-none focus:border-purple-500/50 placeholder-gray-600 resize-none"
-                    value={novoComment} onChange={e=>setNovoComment(e.target.value)}
-                    onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey) addComment(e); }}/>
+                    className="flex-1 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm outline-none focus:border-purple-500/50 placeholder-gray-600 resize-none"
+                    value={novoComentario}
+                    onChange={e=>setNovoComentario(e.target.value)}
+                    onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ adicionarCom(e); } }}/>
                   <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white px-4 rounded-2xl font-bold transition-colors flex items-center justify-center">
                     <i className="fa-solid fa-paper-plane"/>
                   </button>
                 </form>
+                <p className="text-[10px] text-gray-600 mt-1.5 text-center">Enter para enviar · Shift+Enter para nova linha</p>
               </div>
             </div>
           </div>
@@ -776,18 +1016,31 @@ function App() {
   );
 }
 
-// ── Modal Wrapper ──────────────────────────────────────────────
-function MW({ onClose, border, title, icon, ic, children }) {
+// ── COMPONENTE MODAL WRAPPER ──────────────────────────────────
+function ModalWrap({ onClose, borderColor, title, icon, iconColor, children }) {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className={`bg-[#0f1523] border ${border} rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[92vh] overflow-y-auto fade-in`} onClick={e=>e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors"><i className="fa-solid fa-xmark text-xl"/></button>
-        <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-3"><i className={`${icon} ${ic}`}/>{title}</h2>
+      <div className={`bg-[#0f1523] border ${borderColor} rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl relative max-h-[92vh] overflow-y-auto`} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors">
+          <i className="fa-solid fa-xmark text-xl"/>
+        </button>
+        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i className={`${icon} ${iconColor}`}/> {title}
+        </h2>
         {children}
       </div>
     </div>
   );
 }
+
+// ── CSS HELPERS (via Tailwind JIT trick) ──────────────────────
+const style = document.createElement('style');
+style.textContent = `
+  .lbl { display:block; font-size:0.65rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.5rem; }
+  .inp { width:100%; background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.1); border-radius:0.75rem; padding:0.75rem 1rem; color:white; outline:none; transition:border-color 0.2s; resize:vertical; }
+  .inp::placeholder { color:#4b5563; }
+`;
+document.head.appendChild(style);
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
