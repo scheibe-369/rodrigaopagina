@@ -156,17 +156,24 @@ function App() {
     const pos    = dragState.overPos;
     if (fromId && toId && fromId !== toId) {
       setTasks(curr => {
-        const doingList  = curr.filter(t=>t.status==='doing');
-        const otherTasks = curr.filter(t=>t.status!=='doing');
-        const fromIdx = doingList.findIndex(t=>String(t.id)===String(fromId));
-        const toIdx   = doingList.findIndex(t=>String(t.id)===String(toId));
+        // Seção: Próxima da Fila (não iniciadas, em revisão, etc)
+        const targetList = curr.filter(t=>t.status!=='doing'&&t.status!=='inbox'&&t.status!=='done');
+        const otherTasks = curr.filter(t=>t.status==='doing'||t.status==='inbox'||t.status==='done');
+        
+        const fromIdx = targetList.findIndex(t=>String(t.id)===String(fromId));
+        const toIdx   = targetList.findIndex(t=>String(t.id)===String(toId));
+        
         if (fromIdx === -1 || toIdx === -1) return curr;
-        const reordered = [...doingList];
+        
+        const reordered = [...targetList];
         const [moved]   = reordered.splice(fromIdx, 1);
         const insertAt  = pos === 'top' ? toIdx : toIdx + 1;
         const adjusted  = insertAt > fromIdx ? insertAt - 1 : insertAt;
         reordered.splice(adjusted, 0, moved);
-        const ns = [...reordered, ...otherTasks];
+        
+        // Mantém a ordem: doing -> reordered queue -> inbox -> done (ou similar)
+        // O importante é preservar a reordenação local
+        const ns = [...curr.filter(t=>t.status==='doing'), ...reordered, ...curr.filter(t=>t.status==='inbox'), ...curr.filter(t=>t.status==='done')];
         save('tasks', ns);
         return ns;
       });
@@ -186,9 +193,6 @@ function App() {
     const diff = Math.ceil(Math.abs(new Date()-new Date(d))/86400000);
     return diff===1?'1 dia':`${diff} dias`;
   };
-
-  const atualizarNota = (id,nota) => setTasks(curr=>curr.map(t=>String(t.id)===String(id)?{...t,notes:nota}:t));
-  const salvarNota = task => syncTask(task);
 
   // ── COMENTÁRIOS ──
   const getComs = taskId => comentarios[String(taskId)] || [];
@@ -368,28 +372,13 @@ function App() {
               {doingTasks.map(task => {
                 const cl = clienteById(task.clientId);
                 const nComs = getComs(task.id).length;
-                const isDragging = dragState.draggingId === task.id;
-                const isOverTop  = dragState.overId === task.id && dragState.overPos === 'top';
-                const isOverBot  = dragState.overId === task.id && dragState.overPos === 'bottom';
                 return (
                   <div key={task.id}
-                    draggable={true}
-                    onDragStart={e => handleDragStart(e, task.id)}
-                    onDragOver={e => handleDragOver(e, task.id, e.currentTarget)}
-                    onDragEnd={handleDragEnd}
-                    className={`drag-card relative rounded-3xl bg-gray-900/50 border p-1 overflow-hidden backdrop-blur-sm transition-all duration-300
-                      ${isDragging ? 'is-dragging border-white/5' : 'border-white/5 hover:border-white/20'}
-                      ${isOverTop  ? 'drag-over-top'    : ''}
-                      ${isOverBot  ? 'drag-over-bottom' : ''}
-                    `}>
+                    className="relative rounded-3xl bg-gray-900/50 border border-white/5 p-1 overflow-hidden backdrop-blur-sm hover:border-white/20 transition-all duration-500">
                     <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${cl.theme}`}/>
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {/* Drag handle */}
-                          <span className="text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing transition-colors" title="Arraste para reordenar">
-                            <i className="fa-solid fa-grip-vertical text-xs"/>
-                          </span>
                           <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${cl.bg} ${cl.text} border ${cl.border}`}>{cl.name}</span>
                           {task.solicitante&&<span className="text-xs text-gray-500"><i className="fa-regular fa-user mr-1"/>{task.solicitante}</span>}
                         </div>
@@ -515,30 +504,43 @@ function App() {
             <div className="space-y-4 pt-4 border-t border-white/5">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-blue-500/20 text-blue-400 rounded-lg flex items-center justify-center"><i className="fa-solid fa-chart-line"/></div>
-                <h2 className="text-xl font-bold text-white">Esteira / Demandas</h2>
+                <h2 className="text-xl font-bold text-white">Próxima da Fila</h2>
               </div>
-              <div className="bg-gray-900/30 border border-white/5 rounded-3xl p-2 backdrop-blur-sm max-h-[400px] overflow-y-auto">
+              <div className="bg-gray-900/30 border border-white/5 rounded-3xl p-2 backdrop-blur-sm max-h-[500px] overflow-y-auto space-y-2">
                 {queueTasks.map(task => {
                   const cl = clienteById(task.clientId);
+                  const isDragging = dragState.draggingId === task.id;
+                  const isOverTop  = dragState.overId === task.id && dragState.overPos === 'top';
+                  const isOverBot  = dragState.overId === task.id && dragState.overPos === 'bottom';
+                  
                   return (
-                    <div key={task.id} className="group p-4 flex items-center justify-between hover:bg-white/5 rounded-2xl transition-colors border-b border-white/5 last:border-0">
+                    <div key={task.id} 
+                      draggable={true}
+                      onDragStart={e => handleDragStart(e, task.id)}
+                      onDragOver={e => handleDragOver(e, task.id, e.currentTarget)}
+                      onDragEnd={handleDragEnd}
+                      className={`drag-card group p-4 flex items-center justify-between hover:bg-white/5 rounded-2xl transition-all border-b border-white/5 last:border-0
+                        ${isDragging ? 'is-dragging bg-white/5' : ''}
+                        ${isOverTop  ? 'drag-over-top'    : ''}
+                        ${isOverBot  ? 'drag-over-bottom' : ''}
+                      `}>
                       <div className="flex items-center gap-4">
-                        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${cl.theme}`}/>
+                        <div className={`w-3 h-3 rounded-full bg-gradient-to-r shadow-lg ${cl.theme}`} title={cl.name}/>
                         <div>
                           <h4 className="text-sm font-semibold text-gray-200 group-hover:text-white">{task.title}</h4>
-                          <p className={`text-xs mt-1 ${cl.text}`}>{cl.name} · <span className="text-gray-500">{task.platform}</span></p>
+                          <p className={`text-[10px] mt-1 uppercase font-bold tracking-wider ${cl.text}`}>{cl.name} · <span className="text-gray-500">{task.platform}</span></p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded-md border border-white/5">{task.status==='review'?'Aprovação':'Fila'}</span>
-                        <button onClick={()=>abrirEdicao(task)} className="opacity-0 group-hover:opacity-100 bg-white/10 hover:bg-white/20 text-white p-1.5 rounded text-xs transition-all">
+                        {task.deadline&&<span className="text-[10px] text-gray-500 bg-black/30 px-2 py-0.5 rounded border border-white/5">{task.deadline}</span>}
+                        <button onClick={()=>abrirEdicao(task)} className="opacity-0 group-hover:opacity-100 bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl text-xs transition-all border border-white/10">
                           <i className="fa-solid fa-play"/>
                         </button>
                       </div>
                     </div>
                   );
                 })}
-                {queueTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma demanda na esteira.</p>}
+                {queueTasks.length===0&&<p className="text-center text-gray-500 py-4 text-sm">Nenhuma demanda na fila.</p>}
               </div>
             </div>
           </section>
