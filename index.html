@@ -71,9 +71,38 @@
         const CRIATIVOS_MOCK = [];
         const ANUNCIOS_MOCK = [];
 
+        // --- MIGRACAO DE SCHEMA (limpa dados em formato antigo) ---
+        // A versao antiga salvava task.clientId (string). A nova usa task.client (objeto).
+        // Se detectar o formato antigo, limpa todas as chaves ts3_ pra evitar crash no render.
+        (function migrateSchema() {
+            try {
+                const keys = ['tasks', 'criativos'];
+                let needsWipe = false;
+                for (const k of keys) {
+                    const raw = window.localStorage.getItem('ts3_' + k);
+                    if (!raw) continue;
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        const first = parsed[0];
+                        // Formato antigo: tem clientId (string) e NAO tem client (objeto com .name)
+                        if (first && first.clientId !== undefined && (!first.client || typeof first.client !== 'object')) {
+                            needsWipe = true;
+                            break;
+                        }
+                    }
+                }
+                if (needsWipe) {
+                    ['clientes', 'tasks', 'anuncios', 'criativos', 'comentarios', 'nomeUsuario'].forEach(k => {
+                        window.localStorage.removeItem('ts3_' + k);
+                    });
+                    console.info('[ts3] Dados em formato antigo detectados e limpos. Recarregando estado fresh.');
+                }
+            } catch (e) { console.warn('[ts3] Migration check failed:', e); }
+        })();
+
         // Auxiliares LocalStorage
         const loadLocal = (key, fallback) => {
-            try { const item = window.localStorage.getItem('ts3_' + key); return item ? JSON.parse(item) : fallback; } 
+            try { const item = window.localStorage.getItem('ts3_' + key); return item ? JSON.parse(item) : fallback; }
             catch (e) { return fallback; }
         };
         const saveLocal = (key, data) => { window.localStorage.setItem('ts3_' + key, JSON.stringify(data)); };
@@ -87,12 +116,68 @@
 
           // --- ESTADOS DO SISTEMA ---
           const [clientes, setClientes] = useState(() => loadLocal('clientes', INITIAL_CLIENTS));
-          const [globalClientFilter, setGlobalClientFilter] = useState('ALL'); 
+          const [globalClientFilter, setGlobalClientFilter] = useState('ALL');
           const [activeAdTab, setActiveAdTab] = useState(clientes[0]?.id || 'moteis');
 
           const [tasks, setTasks] = useState(() => loadLocal('tasks', TAREFAS_MOCK));
           const [anuncios, setAnuncios] = useState(() => loadLocal('anuncios', ANUNCIOS_MOCK));
           const [criativos, setCriativos] = useState(() => loadLocal('criativos', CRIATIVOS_MOCK));
+
+          // --- SYNC COM SERVIDOR (KV via /api/state) ---
+          // Estado compartilhado entre todos que abrem o link.
+          const [serverLoaded, setServerLoaded] = useState(false);
+          const [syncStatus, setSyncStatus] = useState('loading'); // 'loading' | 'synced' | 'saving' | 'error'
+          const saveTimerRef = useRef(null);
+
+          // On mount: buscar estado do servidor e sobrescrever estado local
+          useEffect(() => {
+              fetch('/api/state', { cache: 'no-store' })
+                  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                  .then(data => {
+                      if (data && typeof data === 'object') {
+                          if (Array.isArray(data.clientes) && data.clientes.length > 0) {
+                              setClientes(data.clientes); saveLocal('clientes', data.clientes);
+                          }
+                          if (Array.isArray(data.tasks)) {
+                              setTasks(data.tasks); saveLocal('tasks', data.tasks);
+                          }
+                          if (Array.isArray(data.anuncios)) {
+                              setAnuncios(data.anuncios); saveLocal('anuncios', data.anuncios);
+                          }
+                          if (Array.isArray(data.criativos)) {
+                              setCriativos(data.criativos); saveLocal('criativos', data.criativos);
+                          }
+                      }
+                      setSyncStatus('synced');
+                  })
+                  .catch(err => {
+                      console.warn('[ts3] Falha ao carregar estado do servidor (usando localStorage):', err);
+                      setSyncStatus('error');
+                  })
+                  .finally(() => setServerLoaded(true));
+          }, []);
+
+          // Debounced save pro servidor: a cada alteracao, agenda PUT em 1.5s
+          useEffect(() => {
+              if (!serverLoaded) return; // nao sobrescreve servidor antes do primeiro load
+              if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+              setSyncStatus('saving');
+              saveTimerRef.current = setTimeout(() => {
+                  const state = { clientes, tasks, anuncios, criativos };
+                  fetch('/api/state', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(state),
+                  })
+                  .then(r => { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+                  .then(() => setSyncStatus('synced'))
+                  .catch(err => {
+                      console.warn('[ts3] Falha ao salvar no servidor:', err);
+                      setSyncStatus('error');
+                  });
+              }, 1500);
+              return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+          }, [clientes, tasks, anuncios, criativos, serverLoaded]);
 
           // Estados de Modais
           const [isAdModalOpen, setIsAdModalOpen] = useState(false);
@@ -363,6 +448,18 @@
                     <div className="flex items-center gap-2 mb-2">
                       <i className="fa-solid fa-wand-magic-sparkles text-fuchsia-400"></i>
                       <span className="text-sm font-semibold tracking-wider text-fuchsia-400 uppercase">Tráfego Studio</span>
+                      {syncStatus === 'loading' && (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1.5"><i className="fa-solid fa-circle-notch fa-spin"></i> Carregando</span>
+                      )}
+                      {syncStatus === 'saving' && (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 flex items-center gap-1.5"><i className="fa-solid fa-cloud-arrow-up"></i> Salvando</span>
+                      )}
+                      {syncStatus === 'synced' && (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5"><i className="fa-solid fa-cloud-arrow-up"></i> Sincronizado</span>
+                      )}
+                      {syncStatus === 'error' && (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1.5" title="Falha na comunicação com o servidor"><i className="fa-solid fa-triangle-exclamation"></i> Offline</span>
+                      )}
                     </div>
                     <h1 className="text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-500 tracking-tight">
                       Central de Produção

@@ -5,3 +5,7 @@ compatibility_date = "2024-01-01"
 [[routes]]
 pattern = "trafego.ioncomunity.com.br/*"
 zone_name = "ioncomunity.com.br"
+
+[[kv_namespaces]]
+binding = "TRAFEGO_STATE"
+id = "e931e3fd6dd84cf2bdbe6d50809b2401"
