@@ -827,7 +827,7 @@
 
                     <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2 border border-white/5 rounded-2xl bg-[#111827]/40 p-2">
                         {doneTasks.map(task => (
-                            <div key={task.id} className="bg-gray-900/60 border border-white/5 p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 opacity-90 hover:opacity-100 hover:border-emerald-500/30 transition-all">
+                            <div key={task.id} className="group bg-gray-900/60 border border-white/5 p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 opacity-90 hover:opacity-100 hover:border-emerald-500/30 transition-all">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0"><i className="fa-solid fa-check text-xs"></i></div>
                                     <div className="min-w-0">
@@ -839,17 +839,26 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap md:flex-nowrap items-center gap-4 text-xs text-gray-400 shrink-0 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
-                                    <div className="flex flex-col hidden md:flex"><span className="text-[9px] uppercase tracking-wider text-gray-500">Início</span> <span className="text-gray-300 font-medium">{formatDate(task.startDate)}</span></div>
-                                    <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Término</span> <span className="text-emerald-400 font-medium">{formatDate(task.finishedAt)}</span></div>
-                                    <div className="w-px h-6 bg-white/10 hidden md:block"></div>
-                                    <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Tempo Levado</span> <span className="text-orange-400 font-black">{getTempoDecorrido(task.startDate, task.finishedAt)}</span></div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <div className="flex flex-wrap md:flex-nowrap items-center gap-4 text-xs text-gray-400 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
+                                        <div className="flex flex-col hidden md:flex"><span className="text-[9px] uppercase tracking-wider text-gray-500">Início</span> <span className="text-gray-300 font-medium">{formatDate(task.startDate)}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Término</span> <span className="text-emerald-400 font-medium">{formatDate(task.finishedAt)}</span></div>
+                                        <div className="w-px h-6 bg-white/10 hidden md:block"></div>
+                                        <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Tempo Levado</span> <span className="text-orange-400 font-black">{getTempoDecorrido(task.startDate, task.finishedAt)}</span></div>
+                                    </div>
+                                    <button
+                                        onClick={() => { if (window.confirm(`Excluir "${task.title}" do histórico? Esta ação não pode ser desfeita.`)) deleteData('tasks', task.id); }}
+                                        className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-white/10 hover:border-red-500/30 rounded-lg transition-all md:opacity-0 md:group-hover:opacity-100"
+                                        title="Excluir do histórico"
+                                    >
+                                        <i className="fa-solid fa-trash text-xs"></i>
+                                    </button>
                                 </div>
                             </div>
                         ))}
-                        
+
                         {criativosDone.map(c => (
-                            <div key={c.id} className="bg-gray-900/60 border border-white/5 p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 opacity-90 hover:opacity-100 hover:border-emerald-500/30 transition-all">
+                            <div key={c.id} className="group bg-gray-900/60 border border-white/5 p-3 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 opacity-90 hover:opacity-100 hover:border-emerald-500/30 transition-all">
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                     <div className="w-8 h-8 rounded-full bg-fuchsia-500/20 text-fuchsia-400 flex items-center justify-center flex-shrink-0"><i className="fa-solid fa-palette text-xs"></i></div>
                                     <div className="min-w-0">
@@ -861,11 +870,20 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap md:flex-nowrap items-center gap-4 text-xs text-gray-400 shrink-0 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
-                                    <div className="flex flex-col hidden md:flex"><span className="text-[9px] uppercase tracking-wider text-gray-500">Pedido em</span> <span className="text-gray-300 font-medium">{formatDate(c.requestedAt)}</span></div>
-                                    <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Término</span> <span className="text-emerald-400 font-medium">{formatDate(c.finishedAt)}</span></div>
-                                    <div className="w-px h-6 bg-white/10 hidden md:block"></div>
-                                    <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Tempo Levado</span> <span className="text-fuchsia-400 font-black">{getTempoDecorrido(c.startedAt, c.finishedAt)}</span></div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <div className="flex flex-wrap md:flex-nowrap items-center gap-4 text-xs text-gray-400 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
+                                        <div className="flex flex-col hidden md:flex"><span className="text-[9px] uppercase tracking-wider text-gray-500">Pedido em</span> <span className="text-gray-300 font-medium">{formatDate(c.requestedAt)}</span></div>
+                                        <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Término</span> <span className="text-emerald-400 font-medium">{formatDate(c.finishedAt)}</span></div>
+                                        <div className="w-px h-6 bg-white/10 hidden md:block"></div>
+                                        <div className="flex flex-col"><span className="text-[9px] uppercase tracking-wider text-gray-500">Tempo Levado</span> <span className="text-fuchsia-400 font-black">{getTempoDecorrido(c.startedAt, c.finishedAt)}</span></div>
+                                    </div>
+                                    <button
+                                        onClick={() => { if (window.confirm(`Excluir "${c.title}" do histórico? Esta ação não pode ser desfeita.`)) deleteData('criativos', c.id); }}
+                                        className="w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 border border-white/10 hover:border-red-500/30 rounded-lg transition-all md:opacity-0 md:group-hover:opacity-100"
+                                        title="Excluir do histórico"
+                                    >
+                                        <i className="fa-solid fa-trash text-xs"></i>
+                                    </button>
                                 </div>
                             </div>
                         ))}
